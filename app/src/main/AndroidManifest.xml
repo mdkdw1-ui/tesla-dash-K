@@ -7,12 +7,13 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
-        android:allowBackup="true"
-        android:icon="@drawable/ic_launcher"
-        android:roundIcon="@drawable/ic_launcher"
-        android:label="TeslaDashK"
-        android:supportsRtl="true"
-        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+    
+    android:allowBackup="true"
+    android:icon="@drawable/ic_launcher"
+    android:roundIcon="@drawable/ic_launcher"
+    android:label="TEST_999"  <!-- 앱 이름을 일시적으로 변경 -->
+    android:supportsRtl="true"
+    android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
         <activity
             android:name=".MainActivity"
