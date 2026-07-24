@@ -20,7 +20,7 @@ jobs:
         node-version: 18
 
     - name: Install dependencies
-      run: npm install
+      run: npm install --legacy-peer-deps
 
     - name: Generate Native Android Folder (Expo Prebuild)
       run: npx expo prebuild --platform android --clean
@@ -40,9 +40,3 @@ jobs:
       with:
         name: release-apk
         path: android/app/build/outputs/apk/release/
-
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: release-apk
-        path: android/app/build/outputs/apk/release/app-release.apk
