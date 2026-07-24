@@ -23,8 +23,8 @@ jobs:
     - name: Install Gradle
       run: sudo apt-get update && sudo apt-get install -y gradle
 
-    - name: Generate Gradle Wrapper
-      run: gradle wrapper
+    - name: Generate Gradle Wrapper (Java 17 compatible)
+      run: gradle wrapper --gradle-version 7.5
 
     - name: Make gradlew executable
       run: chmod +x gradlew
