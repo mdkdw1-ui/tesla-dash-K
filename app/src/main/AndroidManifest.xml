@@ -2,19 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
-    
-    android:allowBackup="true"
-    android:icon="@drawable/ic_launcher"
-    android:roundIcon="@drawable/ic_launcher"
-    android:label="TEST_999"  <!-- 앱 이름을 일시적으로 변경 -->
-    android:supportsRtl="true"
-    android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
-
+        android:allowBackup="true"
+        android:label="TeslaDashK"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -23,12 +17,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!-- 백그라운드 서비스 -->
-        <service
-            android:name=".service.GuardianService"
-            android:foregroundServiceType="dataSync"
-            android:exported="false" />
+        
     </application>
 
 </manifest>
