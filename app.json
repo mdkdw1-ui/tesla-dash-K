@@ -5,6 +5,9 @@
     "version": "1.0.0",
     "android": {
       "package": "com.tesla.dashk"
+    },
+    "splash": {
+      "backgroundColor": "#111111"
     }
   }
 }
