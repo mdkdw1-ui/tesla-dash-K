@@ -1,43 +1,60 @@
 package com.example.tesladashk.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.tesladashk.viewmodel.TeslaViewModel
 
 @Composable
-fun GuardianScreen(viewModel: TeslaViewModel, onToggleService: (Boolean) -> Unit) {
-    val isGuardianActive by viewModel.isGuardianActive.collectAsState()
+fun GuardianScreen(
+    logs: List<String>,
+    onSendAlert: (String, String) -> Unit
+) {
+    var topic by remember { mutableStateOf("tesla-dash-alerts") }
+    var message by remember { mutableStateOf("Test Guardian Alert") }
 
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text("감시 모드 가디언", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text("백그라운드 감시 활성화", style = MaterialTheme.typography.bodyLarge)
-            Switch(
-                checked = isGuardianActive,
-                onCheckedChange = { checked ->
-                    viewModel.setGuardianActive(checked)
-                    onToggleService(checked)
-                }
-            )
-        }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Text("Guardian Settings", style = MaterialTheme.typography.titleLarge)
+        Spacer(modifier = Modifier.height(8.dp))
 
-        Spacer(modifier = Modifier.height(32.dp))
-        
+        OutlinedTextField(
+            value = topic,
+            onValueChange = { topic = it },
+            label = { Text("Ntfy Topic") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedTextField(
+            value = message,
+            onValueChange = { message = it },
+            label = { Text("Alert Message") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
         Button(
-            onClick = { viewModel.flashHeadlights() },
+            onClick = { onSendAlert(topic, message) },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("⚡ 전조등 테스트")
+            Text("Send Manual Alert")
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+        Text("Logs", style = MaterialTheme.typography.titleMedium)
+
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            items(logs) { log ->
+                Text(text = log, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(4.dp))
+                HorizontalDivider()
+            }
         }
     }
 }
