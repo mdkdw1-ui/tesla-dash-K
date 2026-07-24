@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.TeslaDashK" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- 앱 기본 테마 정의 -->
+    </style>
+</resources>
