@@ -4,7 +4,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object ApiClient {
-    private const val TESLA_BASE_URL = "https://your-vercel-backend-url.com/"
+    private const val TESLA_BASE_URL = "https://my-tesla-app-six.vercel.app/"
     private const val NTFY_BASE_URL = "https://ntfy.sh/"
 
     val teslaApi: TeslaApi by lazy {
