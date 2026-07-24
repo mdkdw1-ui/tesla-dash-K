@@ -1,6 +1,5 @@
 package com.example.tesladashk.ui
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -9,32 +8,46 @@ import com.example.tesladashk.ui.screens.GuardianScreen
 import com.example.tesladashk.ui.screens.MonitorScreen
 import com.example.tesladashk.viewmodel.TeslaViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardApp(viewModel: TeslaViewModel, onToggleService: (Boolean) -> Unit) {
-    var selectedMainTab by remember { mutableStateOf("monitor") }
+fun DashboardApp(viewModel: TeslaViewModel) {
+    var selectedTab by remember { mutableIntStateOf(0) }
+    val state by viewModel.uiState.collectAsState()
 
     Scaffold(
+        topBar = {
+            TopAppBar(title = { Text("TeslaDash-K Dashboard") })
+        },
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
-                    icon = { Text("🚗") },
-                    label = { Text("테슬라 모니터") },
-                    selected = selectedMainTab == "monitor",
-                    onClick = { selectedMainTab = "monitor" }
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    label = { Text("Monitor") },
+                    icon = {}
                 )
                 NavigationBarItem(
-                    icon = { Text("🛡️") },
-                    label = { Text("감시 가디언") },
-                    selected = selectedMainTab == "guardian",
-                    onClick = { selectedMainTab = "guardian" }
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    label = { Text("Guardian") },
+                    icon = {}
                 )
             }
         }
-    ) { paddingValues ->
-        Box(modifier = Modifier.padding(paddingValues)) {
-            when (selectedMainTab) {
-                "monitor" -> MonitorScreen()
-                "guardian" -> GuardianScreen(viewModel, onToggleService)
+    ) { padding ->
+        Surface(modifier = Modifier.padding(padding)) {
+            when (selectedTab) {
+                0 -> MonitorScreen(
+                    vehicleName = state.vehicleName,
+                    batteryLevel = state.batteryLevel,
+                    isLocked = state.isLocked,
+                    onLockToggle = { viewModel.toggleLock() },
+                    onRefresh = { viewModel.refreshState() }
+                )
+                1 -> GuardianScreen(
+                    logs = state.logs,
+                    onSendAlert = { topic, msg -> viewModel.sendNtfyAlert(topic, msg) }
+                )
             }
         }
     }
