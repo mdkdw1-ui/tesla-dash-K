@@ -19,6 +19,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        // 앱이 꺼져 있던 상태에서 테슬라 로그인 딥링크로 실행되었을 때 처리
+        handleDeepLink(intent)
+        
         setContent {
             MaterialTheme {
                 Surface(
@@ -28,18 +31,36 @@ class MainActivity : ComponentActivity() {
                     DashboardApp(
                         viewModel = viewModel,
                         onToggleService = { isChecked ->
-                            val intent = Intent(this, GuardianService::class.java)
+                            val serviceIntent = Intent(this, GuardianService::class.java)
                             if (isChecked) {
                                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                                    startForegroundService(intent)
+                                    startForegroundService(serviceIntent)
                                 } else {
-                                    startService(intent)
+                                    startService(serviceIntent)
                                 }
                             } else {
-                                stopService(intent)
+                                stopService(serviceIntent)
                             }
                         }
                     )
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        // 앱이 이미 켜져 있는 상태에서 테슬라 로그인 후 돌아올 때 처리
+        handleDeepLink(intent)
+    }
+
+    private fun handleDeepLink(intent: Intent?) {
+        intent?.data?.let { uri ->
+            if (uri.scheme == "tesladashk" && uri.host == "oauth-callback") {
+                val code = uri.getQueryParameter("code")
+                if (code != null) {
+                    // TODO: 테슬라 인증 코드(code)를 이용해 백엔드 토큰 교환 요청 수행
                 }
             }
         }
