@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "Tesla Dash K",
+    "slug": "tesla-dash-k",
+    "version": "1.0.0",
+    "android": {
+      "package": "com.tesla.dashk"
+    }
+  }
+}
