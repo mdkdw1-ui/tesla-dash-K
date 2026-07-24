@@ -4,6 +4,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -23,7 +24,16 @@ class GuardianService : Service() {
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .build()
 
-        startForeground(1001, notification)
+        // Android 14 (API 34) 포그라운드 서비스 타입 명시
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                1001,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            startForeground(1001, notification)
+        }
 
         if (!isRunning) {
             isRunning = true
@@ -37,12 +47,11 @@ class GuardianService : Service() {
         serviceScope.launch {
             while (isRunning) {
                 try {
-                    // 예시: 백그라운드 상태 체크 및 ntfy 알림 로직
-                    // ApiClient.ntfyApi.sendNotification("my-tesla-topic", "Guardian Check: Normal")
+                    // 백그라운드 상태 체크 및 ntfy 알림 로직
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
-                delay(60000) // 1분 주기로 감시
+                delay(60000)
             }
         }
     }
@@ -55,7 +64,7 @@ class GuardianService : Service() {
                 NotificationManager.IMPORTANCE_LOW
             )
             val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            manager?.createNotificationChannel(channel)
         }
     }
 
