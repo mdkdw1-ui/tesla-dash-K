@@ -3,6 +3,10 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+def supabaseUrl = project.findProperty('SUPABASE_URL') ?: ''
+def supabaseAnonKey = project.findProperty('SUPABASE_ANON_KEY') ?: ''
+def kakaoNativeAppKey = project.findProperty('KAKAO_NATIVE_APP_KEY') ?: ''
+
 android {
     namespace 'com.mdkdw1.ui.tesla'
     compileSdk 34
@@ -14,9 +18,9 @@ android {
         versionCode 1
         versionName "1.0"
 
-        buildConfigField 'String', 'SUPABASE_URL', ""${project.findProperty('SUPABASE_URL') ?: ''}""
-        buildConfigField 'String', 'SUPABASE_ANON_KEY', ""${project.findProperty('SUPABASE_ANON_KEY') ?: ''}""
-        buildConfigField 'String', 'KAKAO_NATIVE_APP_KEY', ""${project.findProperty('KAKAO_NATIVE_APP_KEY') ?: ''}""
+        buildConfigField "String", "SUPABASE_URL", ""${supabaseUrl}""
+        buildConfigField "String", "SUPABASE_ANON_KEY", ""${supabaseAnonKey}""
+        buildConfigField "String", "KAKAO_NATIVE_APP_KEY", ""${kakaoNativeAppKey}""
     }
 
     buildFeatures {
@@ -31,6 +35,24 @@ android {
     kotlinOptions {
         jvmTarget = '17'
     }
+
+    signingConfigs {
+        release {
+            def storeFilePath = System.getenv("RELEASE_STORE_FILE")
+            if (storeFilePath != null) {
+                storeFile file(storeFilePath)
+            }
+            storePassword System.getenv("RELEASE_STORE_PASSWORD")
+            keyAlias System.getenv("RELEASE_KEY_ALIAS")
+            keyPassword System.getenv("RELEASE_KEY_PASSWORD")
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
+    }
 }
 
 dependencies {
@@ -39,9 +61,7 @@ dependencies {
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
-
     implementation 'com.kakao.maps.open:android:2.13.1'
-
     implementation platform('io.github.jan-tennert.supabase:bom:2.5.4')
     implementation 'io.github.jan-tennert.supabase:postgrest-kt'
     implementation 'io.github.jan-tennert.supabase:gotrue-kt'
