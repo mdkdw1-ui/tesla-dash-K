@@ -23,6 +23,7 @@ class TeslaViewModel : ViewModel() {
 
     private val _trips = MutableStateFlow<List<TripItem>>(emptyList())
     val trips: StateFlow<List<TripItem>> = _trips.asStateFlow()
+    val tripsState: StateFlow<List<TripItem>> = _trips.asStateFlow()
 
     private val _logs = MutableStateFlow<List<String>>(emptyList())
     val logs: StateFlow<List<String>> = _logs.asStateFlow()
