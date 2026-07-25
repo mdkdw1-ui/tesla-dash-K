@@ -6,6 +6,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.example.tesladashk.network.TeslaVercelApi
 import com.example.tesladashk.network.NtfyApi
+import com.example.tesladashk.network.SentryStatusResponse
 import kotlinx.coroutines.*
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -72,8 +73,10 @@ class GuardianService : Service() {
                         }
 
                         val isLocked = data.locked ?: true
-                        val isDoorOpen = data.doorsOpen?.let { it.df == true || it.dr == true || it.pf == true || it.pr == true } ?: false
-                        val isTrunkOpen = data.trunksOpen?.let { it.ft == true || it.rt == true } ?: false
+                        val doors = data.doorsOpen
+                        val isDoorOpen = doors?.df == true || doors?.dr == true || doors?.pf == true || doors?.pr == true
+                        val trunks = data.trunksOpen
+                        val isTrunkOpen = trunks?.ft == true || trunks?.rt == true
 
                         if (isLocked && (isDoorOpen || isTrunkOpen)) {
                             val target = if (isDoorOpen && isTrunkOpen) "문/트렁크" else if (isDoorOpen) "도어" else "트렁크"

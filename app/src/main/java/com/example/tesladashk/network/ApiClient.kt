@@ -13,46 +13,55 @@ data class AppConfig(
 )
 
 data class VehicleRow(
-    val id: String?,
-    @SerializedName("vehicle_id") val vehicleId: String?,
-    val vin: String?,
-    @SerializedName("battery_level") val batteryLevel: Int?,
-    val odometer: Double?,
-    @SerializedName("outside_temp") val outsideTemp: Double?,
-    @SerializedName("sentry_mode") val sentryMode: Boolean?,
-    @SerializedName("is_sentry") val isSentry: Boolean?,
-    @SerializedName("tpms_fl") val tpmsFl: Double?,
-    @SerializedName("tpms_fr") val tpmsFr: Double?,
-    @SerializedName("tpms_rl") val tpmsRl: Double?,
-    @SerializedName("tpms_rr") val tpmsRr: Double?,
-    @SerializedName("updated_at") val updatedAt: String?,
-    @SerializedName("raw_data") val rawData: Any?
+    val id: String? = null,
+    @SerializedName("vehicle_id") val vehicleId: String? = null,
+    val vin: String? = null,
+    @SerializedName("battery_level") val batteryLevel: Int? = null,
+    val odometer: Double? = null,
+    @SerializedName("outside_temp") val outsideTemp: Double? = null,
+    @SerializedName("sentry_mode") val sentryMode: Boolean? = null,
+    @SerializedName("is_sentry") val isSentry: Boolean? = null,
+    @SerializedName("tpms_fl") val tpmsFl: Double? = null,
+    @SerializedName("tpms_fr") val tpmsFr: Double? = null,
+    @SerializedName("tpms_rl") val tpmsRl: Double? = null,
+    @SerializedName("tpms_rr") val tpmsRr: Double? = null,
+    @SerializedName("updated_at") val updatedAt: String? = null,
+    @SerializedName("raw_data") val rawData: Any? = null
 )
 
 data class LatLngPoint(val lat: Double, val lng: Double)
 
 data class DrivingTrip(
-    val id: String,
-    val timestamp: Long,
-    val moveKM: Double,
-    val useBattery: Double,
-    val startBat: Int?,
-    val endBat: Int?,
-    val odometer: Double?,
-    val durationMin: Int,
-    val path: List<LatLngPoint>,
+    val id: String = "",
+    val timestamp: Long = 0L,
+    val moveKM: Double = 0.0,
+    val useBattery: Double = 0.0,
+    val startBat: Int? = null,
+    val endBat: Int? = null,
+    val odometer: Double? = null,
+    val durationMin: Int = 0,
+    val path: List<LatLngPoint> = emptyList(),
     var startDong: String = "조회중",
     var endDong: String = "조회중"
 )
 
 data class SentryStatusResponse(
-    val success: Boolean,
-    @SerializedName("sentry_mode") val sentryMode: Boolean?,
-    val locked: Boolean?,
-    @SerializedName("doors_open") val doorsOpen: DoorsOpen?,
-    @SerializedName("trunks_open") val trunksOpen: TrunksOpen?,
-    @SerializedName("sentry_mode_type") val sentryModeType: String?
+    val success: Boolean = false,
+    @SerializedName("sentry_mode") val sentryMode: Boolean? = null,
+    val locked: Boolean? = null,
+    @SerializedName("doors_open") val doorsOpen: DoorsOpen? = null,
+    @SerializedName("trunks_open") val trunksOpen: TrunksOpen? = null,
+    @SerializedName("sentry_mode_type") val sentryModeType: String? = null
 )
 
-data class DoorsOpen(val df: Boolean?, val dr: Boolean?, val pf: Boolean?, val pr: Boolean?)
-data class TrunksOpen(val ft: Boolean?, val rt: Boolean?)
+data class DoorsOpen(
+    val df: Boolean? = null,
+    val dr: Boolean? = null,
+    val pf: Boolean? = null,
+    val pr: Boolean? = null
+)
+
+data class TrunksOpen(
+    val ft: Boolean? = null,
+    val rt: Boolean? = null
+)

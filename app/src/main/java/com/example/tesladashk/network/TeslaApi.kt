@@ -3,6 +3,17 @@ package com.example.tesladashk.network
 import retrofit2.Response
 import retrofit2.http.*
 
+interface TeslaVercelApi {
+    @POST("api/exchange")
+    suspend fun exchangeToken(@Body body: Map<String, String>): Response<Map<String, Any>>
+
+    @POST("api/sentry")
+    suspend fun checkSentry(@Body body: Map<String, String>): Response<SentryStatusResponse>
+
+    @POST("api/headlights")
+    suspend fun flashHeadlights(@Body body: Map<String, String>): Response<Map<String, Any>>
+}
+
 interface VercelSyncApi {
     @POST("api/sync")
     suspend fun triggerSync(
@@ -19,4 +30,15 @@ interface SupabaseApi {
         @Query("order") order: String = "updated_at.desc",
         @Query("limit") limit: Int = 30
     ): Response<List<VehicleRow>>
+}
+
+interface NtfyApi {
+    @POST("{topic}")
+    suspend fun sendNotification(
+        @Path("topic") topic: String,
+        @Header("Title") title: String,
+        @Header("Priority") priority: String,
+        @Header("Tags") tags: String = "car,warning",
+        @Body message: String
+    ): Response<Unit>
 }

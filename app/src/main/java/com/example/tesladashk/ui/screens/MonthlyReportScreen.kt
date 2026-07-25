@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.example.tesladashk.network.DrivingTrip
 import com.example.tesladashk.viewmodel.DashboardViewModel
 
 @Composable
@@ -19,7 +20,7 @@ fun MonthlyReportScreen(viewModel: DashboardViewModel) {
         Text("주행 기록 수: ${trips.size}", color = Color.Gray)
 
         LazyColumn(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            items(trips) { trip ->
+            items(trips) { trip: DrivingTrip ->
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF161820))

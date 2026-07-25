@@ -22,6 +22,10 @@ class DashboardViewModel : ViewModel() {
     private val _vehicleRows = MutableStateFlow<List<VehicleRow>>(emptyList())
     val vehicleRows: StateFlow<List<VehicleRow>> = _vehicleRows
 
+    private val _trips = MutableStateFlow<List<DrivingTrip>>(emptyList())
+    val trips: StateFlow<List<DrivingTrip>> = _trips
+    val allTrips: StateFlow<List<DrivingTrip>> = _trips
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
