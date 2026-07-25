@@ -29,6 +29,7 @@ fun SettingsScreen(
     var supabaseUrl by remember { mutableStateOf(currentConfig.supabaseUrl) }
     var supabaseKey by remember { mutableStateOf(currentConfig.supabaseKey) }
     var kakaoKey by remember { mutableStateOf(currentConfig.kakaoKey) }
+    var nativeKakaoKey by remember { mutableStateOf(currentConfig.nativeKakaoKey) }
     var userUid by remember { mutableStateOf(currentConfig.userUid) }
     var vehicleId by remember { mutableStateOf(currentConfig.vehicleId) }
     var ntfyTopic by remember { mutableStateOf(currentConfig.ntfyTopic) }
@@ -104,6 +105,14 @@ fun SettingsScreen(
                 )
 
                 OutlinedTextField(
+                    value = nativeKakaoKey,
+                    onValueChange = { nativeKakaoKey = it },
+                    label = { Text("카카오 네이티브 앱 Key (지도용)") },
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
                     value = vehicleId,
                     onValueChange = { vehicleId = it },
                     label = { Text("Vehicle ID") },
@@ -119,6 +128,7 @@ fun SettingsScreen(
                             supabaseUrl = supabaseUrl,
                             supabaseKey = supabaseKey,
                             kakaoKey = kakaoKey,
+                            nativeKakaoKey = nativeKakaoKey,
                             userUid = userUid,
                             vehicleId = vehicleId,
                             ntfyTopic = ntfyTopic,

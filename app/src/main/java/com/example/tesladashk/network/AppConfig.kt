@@ -3,8 +3,8 @@ package com.example.tesladashk.network
 data class AppConfig(
     val supabaseUrl: String = "",
     val supabaseKey: String = "",
-    val kakaoKey: String = "",          // REST API Key (주소 변환용)
-    val nativeKakaoKey: String = "",    // Native App Key (지도 SDK용)
+    val kakaoKey: String = "",
+    val nativeKakaoKey: String = "",
     val userUid: String = "",
     val vehicleId: String = "",
     val ntfyTopic: String = "",
