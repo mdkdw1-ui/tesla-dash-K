@@ -49,8 +49,17 @@ class TeslaViewModel(application: Application) : AndroidViewModel(application) {
         val vercelUrl = prefs.getString("vercelUrl", "https://my-tesla-app.vercel.app") ?: ""
         val vehicleId = prefs.getString("vehicleId", "") ?: ""
         val ntfyTopic = prefs.getString("ntfyTopic", "") ?: ""
+        val ghToken = prefs.getString("ghToken", "") ?: ""
 
-        _config.value = ConfigState(kakaoKey, supabaseUrl, supabaseKey, vercelUrl, vehicleId, ntfyTopic)
+        _config.value = ConfigState(
+            kakaoKey = kakaoKey,
+            supabaseUrl = supabaseUrl,
+            supabaseKey = supabaseKey,
+            vercelUrl = vercelUrl,
+            vehicleId = vehicleId,
+            ntfyTopic = ntfyTopic,
+            ghToken = ghToken
+        )
         if (supabaseUrl.isNotBlank() && supabaseKey.isNotBlank()) {
             refreshData()
         }
@@ -99,7 +108,8 @@ class TeslaViewModel(application: Application) : AndroidViewModel(application) {
         supabaseKey: String,
         vercelUrl: String,
         vehicleId: String,
-        ntfyTopic: String
+        ntfyTopic: String,
+        ghToken: String = ""
     ) {
         val cleanUrl = supabaseUrl.trim().removeSuffix("/")
         val cleanKey = supabaseKey.trim()
@@ -107,6 +117,7 @@ class TeslaViewModel(application: Application) : AndroidViewModel(application) {
         val cleanVercel = vercelUrl.trim().removeSuffix("/")
         val cleanVid = vehicleId.trim()
         val cleanNtfy = ntfyTopic.trim()
+        val cleanGh = ghToken.trim()
 
         prefs.edit().apply {
             putString("kakaoKey", cleanKakao)
@@ -115,11 +126,20 @@ class TeslaViewModel(application: Application) : AndroidViewModel(application) {
             putString("vercelUrl", cleanVercel)
             putString("vehicleId", cleanVid)
             putString("ntfyTopic", cleanNtfy)
+            putString("ghToken", cleanGh)
             apply()
         }
 
-        _config.value = ConfigState(cleanKakao, cleanUrl, cleanKey, cleanVercel, cleanVid, cleanNtfy)
-        addLog("[설정] Vercel 연동 정보 저장 완료")
+        _config.value = ConfigState(
+            kakaoKey = cleanKakao,
+            supabaseUrl = cleanUrl,
+            supabaseKey = cleanKey,
+            vercelUrl = cleanVercel,
+            vehicleId = cleanVid,
+            ntfyTopic = cleanNtfy,
+            ghToken = cleanGh
+        )
+        addLog("[설정] 설정 정보 저장 완료")
         refreshData()
     }
 
@@ -277,6 +297,6 @@ class TeslaViewModel(application: Application) : AndroidViewModel(application) {
         val sortedList = parsedList.sortedByDescending { it.timeStr }
         _trips.value = sortedList
 
-        addLog("[동기화 완료] 주행 $drivingCount건, 충전 $chargingCount건 수신")
+        addLog("[동기화 완료] 주행 ${drivingCount}건, 충전 ${chargingCount}건 수신")
     }
 }
