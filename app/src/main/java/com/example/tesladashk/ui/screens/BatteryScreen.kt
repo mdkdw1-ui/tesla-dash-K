@@ -8,14 +8,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
-import com.example.tesladashk.viewmodel.TeslaViewModel
+import com.example.tesladashk.viewmodel.DashboardViewModel
 
 @Composable
-fun BatteryScreen(viewModel: TeslaViewModel) {
+fun BatteryScreen(viewModel: DashboardViewModel) {
     Box(
-        modifier = Modifier.fillMaxSize().background(Color(0xFF0B0F17)),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0D0E12)),
         contentAlignment = Alignment.Center
     ) {
-        Text("🔋 배터리 상세 분석 기능 준비 중", color = Color(0xFFF1F5F9), fontSize = 16.sp)
+        Text("배터리 상세 현황 화면", color = Color.Gray, fontSize = 14.sp)
     }
 }
