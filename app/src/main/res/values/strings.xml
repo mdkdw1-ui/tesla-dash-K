@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">TeslaDashK</string>
+    <string name="title_dashboard">TeslaDashK</string>
+    <string name="subtitle_dashboard">Live vehicle sync and route intelligence</string>
+</resources>

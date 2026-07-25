@@ -1,0 +1,50 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.mdkdw1.ui.tesla'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.mdkdw1.ui.tesla"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+        buildConfigField "String", "SUPABASE_URL", ""${project.findProperty("SUPABASE_URL") ?: ""}""
+        buildConfigField "String", "SUPABASE_ANON_KEY", ""${project.findProperty("SUPABASE_ANON_KEY") ?: ""}""
+        buildConfigField "String", "KAKAO_NATIVE_APP_KEY", ""${project.findProperty("KAKAO_NATIVE_APP_KEY") ?: ""}""
+    }
+
+    buildFeatures {
+        viewBinding true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+
+    implementation 'com.kakao.maps.open:android:2.13.1'
+
+    implementation platform('io.github.jan-tennert.supabase:bom:2.5.4')
+    implementation 'io.github.jan-tennert.supabase:postgrest-kt'
+    implementation 'io.github.jan-tennert.supabase:gotrue-kt'
+    implementation 'io.github.jan-tennert.supabase:realtime-kt'
+    implementation 'io.ktor:ktor-client-okhttp:2.3.12'
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3'
+}

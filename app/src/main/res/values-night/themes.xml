@@ -1,0 +1,19 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.TeslaDashK" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#F5F5F5</item>
+        <item name="colorOnPrimary">#101010</item>
+        <item name="colorPrimaryContainer">#161616</item>
+        <item name="colorOnPrimaryContainer">#F2F2F2</item>
+        <item name="colorSecondary">#B5B5B5</item>
+        <item name="colorOnSecondary">#101010</item>
+        <item name="colorSurface">#050505</item>
+        <item name="colorOnSurface">#F2F2F2</item>
+        <item name="colorSurfaceVariant">#101010</item>
+        <item name="colorOnSurfaceVariant">#BDBDBD</item>
+        <item name="colorOutline">#262626</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="23">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
+    </style>
+</resources>
