@@ -1,14 +1,9 @@
 package com.example.tesladashk.ui
 
-import android.annotation.SuppressLint
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,233 +11,86 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.tesladashk.ui.screens.GuardianScreen
+import com.example.tesladashk.ui.screens.MonitorScreen
 import com.example.tesladashk.viewmodel.TeslaViewModel
 
-// ==========================================
-// 1. 코틀린 데이터 모델
-// ==========================================
-enum class VehicleStatusType {
-    DRIVING, PARKED, CHARGING, SLEEP, UNKNOWN
-}
-
-data class StatusHistoryItem(
-    val timestamp: String,
-    val type: VehicleStatusType,
-    val batteryLevel: Int,
-    val address: String,
-    val detailText: String = ""
-)
-
-// ==========================================
-// 2. 주소 정제 함수 (서울특별시, 경기도, 고양시 제거)
-// ==========================================
-fun formatAddress(address: String?): String {
-    if (address.isNullOrBlank()) return ""
-    return address
-        .replace("서울특별시 ", "")
-        .replace("서울특별시", "")
-        .replace("경기도 ", "")
-        .replace("경기도", "")
-        .replace("고양시 ", "")
-        .replace("고양시", "")
-        .trim()
-}
-
-// ==========================================
-// 3. 코틀린 Jetpack Compose 메인 대시보드 화면
-// ==========================================
 @Composable
-fun DashboardApp(
-    viewModel: TeslaViewModel = viewModel(),
-    historyItems: List<StatusHistoryItem> = remember {
-        listOf(
-            StatusHistoryItem("14:20", VehicleStatusType.PARKED, 78, formatAddress("경기도 고양시 식사동 123-4"), "주차 중"),
-            StatusHistoryItem("12:10", VehicleStatusType.CHARGING, 75, formatAddress("경기도 고양시 풍동 456"), "+15% 충전"),
-            StatusHistoryItem("10:00", VehicleStatusType.DRIVING, 60, formatAddress("서울특별시 마두동 789"), "12.5km")
-        )
-    }
-) {
+fun DashboardApp(viewModel: TeslaViewModel) {
+    var mainTab by remember { mutableStateOf("monitor") }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(Color(0xFF0D0E12))
     ) {
-        // 상단 카카오맵 지도뷰 (WebView)
-        KakaoMapView(
-            latitude = 37.6581,
-            longitude = 126.8320,
-            pathPointsJson = "[{\"lat\": 37.6581, \"lng\": 126.8320}, {\"lat\": 37.6600, \"lng\": 126.8350}]",
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
+        HeaderBar(
+            onRefresh = { },
+            onSync = { },
+            onOpenConfig = { }
         )
 
-        // 하단 상태 히스토리 리스트
-        CompactHistoryList(
-            historyItems = historyItems,
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
-        )
-    }
-}
-
-// ==========================================
-// 4. 안드로이드 WebView 카카오맵 연동 컴포넌트
-// ==========================================
-@SuppressLint("SetJavaScriptEnabled")
-@Composable
-fun KakaoMapView(
-    appKey: String = "YOUR_KAKAO_APP_KEY",
-    latitude: Double,
-    longitude: Double,
-    pathPointsJson: String = "[]",
-    modifier: Modifier = Modifier
-) {
-    val htmlContent = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8"/>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=$appKey"></script>
-            <style>
-                html, body, #map { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #121212; }
-            </style>
-        </head>
-        <body>
-            <div id="map"></div>
-            <script>
-                var container = document.getElementById('map');
-                var options = {
-                    center: new kakao.maps.LatLng($latitude, $longitude),
-                    level: 4
-                };
-                var mapInstance = new kakao.maps.Map(container, options);
-
-                var markerPosition = new kakao.maps.LatLng($latitude, $longitude);
-                var marker = new kakao.maps.Marker({ position: markerPosition });
-                marker.setMap(mapInstance);
-
-                var rawPath = $pathPointsJson;
-                if (rawPath && rawPath.length > 0) {
-                    var linePath = rawPath.map(function(pt) {
-                        return new kakao.maps.LatLng(pt.lat, pt.lng);
-                    });
-                    var polyline = new kakao.maps.Polyline({
-                        path: linePath,
-                        strokeWeight: 5,
-                        strokeColor: '#FF0055',
-                        strokeOpacity: 0.8,
-                        strokeStyle: 'solid'
-                    });
-                    polyline.setMap(mapInstance);
-                }
-            </script>
-        </body>
-        </html>
-    """.trimIndent()
-
-    AndroidView(
-        factory = { context ->
-            WebView(context).apply {
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = true
-                webViewClient = WebViewClient()
-                loadDataWithBaseURL("https://dapi.kakao.com", htmlContent, "text/html", "UTF-8", null)
+                .background(Color(0xFF12141C))
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = { mainTab = "monitor" },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (mainTab == "monitor") Color(0xFF2563EB) else Color(0xFF1F2937)
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("⚡ 테슬라 모니터", color = Color.White, fontWeight = FontWeight.Bold)
             }
-        },
-        update = { webView ->
-            webView.loadDataWithBaseURL("https://dapi.kakao.com", htmlContent, "text/html", "UTF-8", null)
-        },
-        modifier = modifier
-    )
-}
+            Button(
+                onClick = { mainTab = "guardian" },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (mainTab == "guardian") Color(0xFFDC2626) else Color(0xFF1F2937)
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("🛡️ 감시 가디언", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        }
 
-// ==========================================
-// 5. Compose 히스토리 리스트 UI
-// ==========================================
-@Composable
-fun CompactHistoryList(
-    historyItems: List<StatusHistoryItem>,
-    modifier: Modifier = Modifier
-) {
-    LazyColumn(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 2.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
-        items(historyItems) { item ->
-            CompactHistoryRow(item)
+        if (mainTab == "monitor") {
+            MonitorScreen(viewModel)
+        } else {
+            GuardianScreen(viewModel)
         }
     }
 }
 
 @Composable
-fun CompactHistoryRow(item: StatusHistoryItem) {
-    val badgeColor = when (item.type) {
-        VehicleStatusType.CHARGING -> Color(0xFF00E676)
-        VehicleStatusType.DRIVING -> Color(0xFF29B6F6)
-        VehicleStatusType.PARKED -> Color(0xFFFFB74D)
-        else -> Color.Gray
-    }
-
-    val badgeText = when (item.type) {
-        VehicleStatusType.CHARGING -> "충전"
-        VehicleStatusType.DRIVING -> "주행"
-        VehicleStatusType.PARKED -> "주차"
-        else -> "대기"
-    }
-
+fun HeaderBar(onRefresh: () -> Unit, onSync: () -> Unit, onOpenConfig: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF1E1E1E), shape = RoundedCornerShape(4.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .background(Color(0xFF12141C))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = item.timestamp,
-            color = Color.LightGray,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.width(42.dp)
-        )
-
-        Box(
-            modifier = Modifier
-                .background(badgeColor.copy(alpha = 0.2f), RoundedCornerShape(3.dp))
-                .padding(horizontal = 5.dp, vertical = 1.dp)
-        ) {
-            Text(
-                text = badgeText,
-                color = badgeColor,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
-            )
+        Column {
+            Text("Tesla Command Hub", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+            Text("Monitor & Guardian", color = Color.Gray, fontSize = 9.sp)
         }
-
-        Spacer(modifier = Modifier.width(6.dp))
-
-        Text(
-            text = item.address,
-            color = Color.White,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            modifier = Modifier.weight(1f)
-        )
-
-        Spacer(modifier = Modifier.width(4.dp))
-
-        Text(
-            text = "${item.batteryLevel}% ${item.detailText}".trim(),
-            color = Color(0xFFFFD54F),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Button(onClick = onRefresh, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
+                Text("🔄 갱신", fontSize = 11.sp)
+            }
+            Button(onClick = onSync, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
+                Text("⚡ Sync", fontSize = 11.sp)
+            }
+            Button(onClick = onOpenConfig, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
+                Text("⚙️ 설정", fontSize = 11.sp)
+            }
+        }
     }
 }

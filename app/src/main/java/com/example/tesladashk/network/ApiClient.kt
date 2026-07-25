@@ -1,59 +1,58 @@
 package com.example.tesladashk.network
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.util.concurrent.TimeUnit
+import com.google.gson.annotations.SerializedName
 
-object ApiClient {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+data class AppConfig(
+    val kakaoKey: String = "159c5d7588efc5939d431f005912f9f3",
+    val supabaseUrl: String = "",
+    val supabaseKey: String = "",
+    val ghToken: String = "",
+    val vehicleId: String = "3744141651867089",
+    val ntfyTopic: String = "MJYAz6ZyjXiujaTDpJ",
+    val accessToken: String = ""
+)
 
-    suspend fun triggerVercelSync(vercelUrl: String): ApiResponse {
-        if (vercelUrl.isBlank()) return ApiResponse(false, 400, "Vercel URL 미설정")
-        return withContext(Dispatchers.IO) {
-            try {
-                val formattedUrl = when {
-                    !vercelUrl.startsWith("http://") && !vercelUrl.startsWith("https://") -> "https://$vercelUrl"
-                    else -> vercelUrl
-                }
-                val targetUrl = if (!formattedUrl.contains("/api/sync")) {
-                    "${formattedUrl.removeSuffix("/")}/api/sync"
-                } else formattedUrl
+data class VehicleRow(
+    val id: String?,
+    @SerializedName("vehicle_id") val vehicleId: String?,
+    val vin: String?,
+    @SerializedName("battery_level") val batteryLevel: Int?,
+    val odometer: Double?,
+    @SerializedName("outside_temp") val outsideTemp: Double?,
+    @SerializedName("sentry_mode") val sentryMode: Boolean?,
+    @SerializedName("is_sentry") val isSentry: Boolean?,
+    @SerializedName("tpms_fl") val tpmsFl: Double?,
+    @SerializedName("tpms_fr") val tpmsFr: Double?,
+    @SerializedName("tpms_rl") val tpmsRl: Double?,
+    @SerializedName("tpms_rr") val tpmsRr: Double?,
+    @SerializedName("updated_at") val updatedAt: String?,
+    @SerializedName("raw_data") val rawData: Any?
+)
 
-                val request = Request.Builder()
-                    .url(targetUrl)
-                    .get()
-                    .build()
+data class LatLngPoint(val lat: Double, val lng: Double)
 
-                client.newCall(request).execute().use { response ->
-                    ApiResponse(response.isSuccessful, response.code, response.body?.string() ?: "")
-                }
-            } catch (e: Exception) {
-                ApiResponse(false, 500, e.localizedMessage ?: "네트워크 오류")
-            }
-        }
-    }
+data class DrivingTrip(
+    val id: String,
+    val timestamp: Long,
+    val moveKM: Double,
+    val useBattery: Double,
+    val startBat: Int?,
+    val endBat: Int?,
+    val odometer: Double?,
+    val durationMin: Int,
+    val path: List<LatLngPoint>,
+    var startDong: String = "조회중",
+    var endDong: String = "조회중"
+)
 
-    suspend fun executeSupabaseGet(url: String, apiKey: String): ApiResponse {
-        return withContext(Dispatchers.IO) {
-            try {
-                val request = Request.Builder()
-                    .url(url)
-                    .addHeader("apikey", apiKey)
-                    .addHeader("Authorization", "Bearer $apiKey")
-                    .get()
-                    .build()
+data class SentryStatusResponse(
+    val success: Boolean,
+    @SerializedName("sentry_mode") val sentryMode: Boolean?,
+    val locked: Boolean?,
+    @SerializedName("doors_open") val doorsOpen: DoorsOpen?,
+    @SerializedName("trunks_open") val trunksOpen: TrunksOpen?,
+    @SerializedName("sentry_mode_type") val sentryModeType: String?
+)
 
-                client.newCall(request).execute().use { response ->
-                    ApiResponse(response.isSuccessful, response.code, response.body?.string() ?: "")
-                }
-            } catch (e: Exception) {
-                ApiResponse(false, 500, e.localizedMessage ?: "네트워크 오류")
-            }
-        }
-    }
-}
+data class DoorsOpen(val df: Boolean?, val dr: Boolean?, val pf: Boolean?, val pr: Boolean?)
+data class TrunksOpen(val ft: Boolean?, val rt: Boolean?)
