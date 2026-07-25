@@ -12,7 +12,6 @@ import com.kakao.vectormap.route.RouteLine
 import com.kakao.vectormap.route.RouteLineLayer
 import com.kakao.vectormap.route.RouteLineOptions
 import com.kakao.vectormap.route.RouteLineSegment
-import com.kakao.vectormap.route.RouteLineStyle
 import com.mdkdw1.ui.tesla.databinding.ActivityKakaoRouteMapBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
