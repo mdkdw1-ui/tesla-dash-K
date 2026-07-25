@@ -11,6 +11,7 @@ import org.json.JSONArray
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 class TeslaViewModel : ViewModel() {
 
@@ -23,9 +24,6 @@ class TeslaViewModel : ViewModel() {
     private val _trips = MutableStateFlow<List<TripItem>>(emptyList())
     val trips: StateFlow<List<TripItem>> = _trips.asStateFlow()
 
-    private val _selectedTrip = MutableStateFlow<TripItem?>(null)
-    val selectedTrip: StateFlow<TripItem?> = _selectedTrip.asStateFlow()
-
     private val _logs = MutableStateFlow<List<String>>(emptyList())
     val logs: StateFlow<List<String>> = _logs.asStateFlow()
 
@@ -35,39 +33,21 @@ class TeslaViewModel : ViewModel() {
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
-    init {
-        addLog("[시스템] TeslaViewModel 준비 완료")
-    }
-
     fun addLog(msg: String) {
-        val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+        val sdf = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        sdf.timeZone = TimeZone.getTimeZone("Asia/Seoul")
+        val time = sdf.format(Date())
         _logs.value = (listOf("[$time] $msg") + _logs.value).take(100)
-    }
-
-    fun clearLogs() {
-        _logs.value = emptyList()
-    }
-
-    fun toggleGuardian(active: Boolean = !_isGuardianActive.value) {
-        _isGuardianActive.value = active
-        addLog("[가디언] 감시 모드 ${if (_isGuardianActive.value) "활성화" else "비활성화"}")
     }
 
     fun refreshData() {
         viewModelScope.launch {
             _isRefreshing.value = true
-            addLog("[갱신 요청] sync.js 백그라운드 실행 및 Supabase 최신 데이터 수신 시작...")
+            addLog("[갱신 요청] Supabase 데이터 수신 시작...")
 
             val cfg = _config.value
             if (cfg.ghToken.isNotBlank()) {
-                val ghResp = ApiClient.triggerGitHubSync(cfg.ghToken)
-                if (ghResp.isSuccess) {
-                    addLog("[GitHub] sync.js 실행 명령 전송 완료")
-                } else {
-                    addLog("[GitHub] sync.js 실행 전송 스킵/실패: ${ghResp.errorMessage}")
-                }
-            } else {
-                addLog("[GitHub] GitHub Token 미설정 (sync.js 실행 생략)")
+                ApiClient.triggerGitHubSync(cfg.ghToken)
             }
 
             syncWithSupabaseInternal()
@@ -76,12 +56,8 @@ class TeslaViewModel : ViewModel() {
     }
 
     fun saveConfig(
-        kakaoKey: String,
-        supabaseUrl: String,
-        supabaseKey: String,
-        ghToken: String,
-        vehicleId: String,
-        ntfyTopic: String
+        kakaoKey: String, supabaseUrl: String, supabaseKey: String,
+        ghToken: String, vehicleId: String, ntfyTopic: String
     ) {
         _config.value = ConfigState(
             kakaoKey = kakaoKey.trim(),
@@ -91,19 +67,16 @@ class TeslaViewModel : ViewModel() {
             vehicleId = vehicleId.trim(),
             ntfyTopic = ntfyTopic.trim()
         )
-        addLog("[설정] API 및 커스텀 설정 저장이 완료되었습니다.")
         refreshData()
     }
 
     private suspend fun syncWithSupabaseInternal() {
         val cfg = _config.value
-        if (cfg.supabaseUrl.isBlank() || cfg.supabaseKey.isBlank()) {
-            addLog("[동기화 실패] Supabase URL/Key 설정 필요")
-            return
-        }
+        if (cfg.supabaseUrl.isBlank() || cfg.supabaseKey.isBlank()) return
 
         val baseUrl = cfg.supabaseUrl.split("/rest/v1")[0].removeSuffix("/")
 
+        // 1. 차량 정보 수신
         val vehicleUrl = "$baseUrl/rest/v1/vehicle?select=*&order=updated_at.desc&limit=1"
         val vehicleResp = ApiClient.executeSupabaseGet(vehicleUrl, cfg.supabaseKey)
         if (vehicleResp.isSuccess) {
@@ -115,12 +88,12 @@ class TeslaViewModel : ViewModel() {
                         statusText = "현재: " + obj.optString("state", "online"),
                         batteryLevel = obj.optInt("battery_level", 0),
                         odometer = obj.optInt("odometer", 0),
-                        outsideTemp = obj.optDouble("outside_temp", 22.0).toFloat(),
+                        outsideTemp = obj.optDouble("outside_temp", 0.0).toFloat(),
                         parkDurationStr = obj.optString("park_duration_str", "상태 수신 완료"),
-                        tpmsFl = obj.optDouble("tpms_fl", 41.0).toFloat(),
-                        tpmsFr = obj.optDouble("tpms_fr", 41.0).toFloat(),
-                        tpmsRl = obj.optDouble("tpms_rl", 41.0).toFloat(),
-                        tpmsRr = obj.optDouble("tpms_rr", 41.0).toFloat()
+                        tpmsFl = obj.optDouble("tpms_fl", 0.0).toFloat(),
+                        tpmsFr = obj.optDouble("tpms_fr", 0.0).toFloat(),
+                        tpmsRl = obj.optDouble("tpms_rl", 0.0).toFloat(),
+                        tpmsRr = obj.optDouble("tpms_rr", 0.0).toFloat()
                     )
                 }
             } catch (e: Exception) {
@@ -128,16 +101,32 @@ class TeslaViewModel : ViewModel() {
             }
         }
 
-        val drivingUrl = "$baseUrl/rest/v1/driving?select=*&order=created_at.desc&limit=50"
+        // 2. 주행 기록 수신 (50개 제한 ➔ 300개로 확대 및 UTC ➔ KST 시차 변환)
+        val drivingUrl = "$baseUrl/rest/v1/driving?select=*&order=created_at.desc&limit=300"
         val drivingResp = ApiClient.executeSupabaseGet(drivingUrl, cfg.supabaseKey)
         if (drivingResp.isSuccess) {
             try {
                 val arr = JSONArray(drivingResp.body)
                 val parsed = mutableListOf<TripItem>()
+
+                val utcFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).apply {
+                    timeZone = TimeZone.getTimeZone("UTC")
+                }
+                val kstFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).apply {
+                    timeZone = TimeZone.getTimeZone("Asia/Seoul")
+                }
+
                 for (i in 0 until arr.length()) {
                     val obj = arr.getJSONObject(i)
                     val rawCreated = obj.optString("created_at", "")
-                    val formattedDate = rawCreated.replace("T", " ").take(16).ifEmpty { "2026-07-22" }
+                    
+                    val kstDateStr = try {
+                        val parsedUtc = utcFormat.parse(rawCreated.take(19))
+                        parsedUtc?.let { kstFormat.format(it) } ?: rawCreated.replace("T", " ").take(16)
+                    } catch (e: Exception) {
+                        rawCreated.replace("T", " ").take(16)
+                    }
+
                     val sAddr = obj.optString("start_address", "출발지")
                     val eAddr = obj.optString("end_address", "도착지")
                     val mKm = obj.optDouble("move_km", 0.0)
@@ -147,13 +136,13 @@ class TeslaViewModel : ViewModel() {
                     parsed.add(
                         TripItem(
                             id = obj.optString("id", "$i"),
-                            timeStr = formattedDate,
+                            timeStr = kstDateStr,
                             startDong = sAddr,
                             endDong = eAddr,
                             moveKm = mKm,
                             durationMin = dMin,
                             useBattery = uBat,
-                            date = formattedDate,
+                            date = kstDateStr,
                             startAddress = sAddr,
                             endAddress = eAddr,
                             distanceKm = mKm,
@@ -163,7 +152,7 @@ class TeslaViewModel : ViewModel() {
                     )
                 }
                 _trips.value = parsed
-                addLog("[주행 동기화] 최신 ${parsed.size}건 동기화 성공")
+                addLog("[주행 동기화 완료] 최신 ${parsed.size}건 수신 (KST 시차 적용)")
             } catch (e: Exception) {
                 addLog("[주행 파싱 오류] ${e.localizedMessage}")
             }
