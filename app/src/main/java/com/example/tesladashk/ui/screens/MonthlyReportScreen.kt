@@ -47,7 +47,6 @@ fun MonthlyReportScreen(viewModel: TeslaViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. 월별 리포트 선택 패널
         item {
             Column(
                 modifier = Modifier
@@ -108,7 +107,6 @@ fun MonthlyReportScreen(viewModel: TeslaViewModel) {
             }
         }
 
-        // 2. 6가지 핵심 통계 그리드
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -126,7 +124,6 @@ fun MonthlyReportScreen(viewModel: TeslaViewModel) {
             }
         }
 
-        // 3. 와이드 평균 전비 카드
         item {
             Column(
                 modifier = Modifier
@@ -160,7 +157,6 @@ fun MonthlyReportScreen(viewModel: TeslaViewModel) {
             }
         }
 
-        // 4. 이달의 최장 운행 시간 TOP 5
         item {
             Text("⏱️ 이달의 최장 운행 시간 TOP 5 (터치 시 주행 지도 이동)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextWhite)
         }
@@ -177,7 +173,6 @@ fun MonthlyReportScreen(viewModel: TeslaViewModel) {
             )
         }
 
-        // 5. 이달의 최장 운행 거리 TOP 5
         item {
             Spacer(modifier = Modifier.height(8.dp))
             Text("📍 이달의 최장 운행 거리 TOP 5 (터치 시 주행 지도 이동)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextWhite)

@@ -34,8 +34,7 @@ fun ConfigDialog(viewModel: TeslaViewModel, onDismiss: () -> Unit) {
             color = CardDark
         ) {
             Column(
-                modifier = Modifier
-                    .padding(20.dp),
+                modifier = Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text("⚙️ 환경 설정", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextWhite)

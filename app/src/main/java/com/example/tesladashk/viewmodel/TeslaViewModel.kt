@@ -53,7 +53,6 @@ class TeslaViewModel : ViewModel() {
         addLog("[가디언] 감시 모드 ${if (_isGuardianActive.value) "활성화" else "비활성화"}")
     }
 
-    // 🔄 갱신 버튼 하나로 sync.js 실행 및 Supabase 데이터 가져오기 동시 수행
     fun refreshData() {
         viewModelScope.launch {
             _isRefreshing.value = true
@@ -105,7 +104,6 @@ class TeslaViewModel : ViewModel() {
 
         val baseUrl = cfg.supabaseUrl.split("/rest/v1")[0].removeSuffix("/")
 
-        // 1. vehicle
         val vehicleUrl = "$baseUrl/rest/v1/vehicle?select=*&order=updated_at.desc&limit=1"
         val vehicleResp = ApiClient.executeSupabaseGet(vehicleUrl, cfg.supabaseKey)
         if (vehicleResp.isSuccess) {
@@ -130,7 +128,6 @@ class TeslaViewModel : ViewModel() {
             }
         }
 
-        // 2. driving
         val drivingUrl = "$baseUrl/rest/v1/driving?select=*&order=created_at.desc&limit=50"
         val drivingResp = ApiClient.executeSupabaseGet(drivingUrl, cfg.supabaseKey)
         if (drivingResp.isSuccess) {

@@ -20,8 +20,8 @@ import com.example.tesladashk.viewmodel.TeslaViewModel
 
 @Composable
 fun DashboardApp(viewModel: TeslaViewModel) {
-    var mainTab by remember { mutableStateOf(0) } // 0: 테슬라 모니터, 1: 감시 가디언
-    var subTab by remember { mutableStateOf(0) }  // 0: 차량 정보, 1: 주행 지도, 2: 월간 리포트, 3: 배터리
+    var mainTab by remember { mutableStateOf(0) }
+    var subTab by remember { mutableStateOf(0) }
     var showConfigDialog by remember { mutableStateOf(false) }
 
     if (showConfigDialog) {
@@ -33,13 +33,11 @@ fun DashboardApp(viewModel: TeslaViewModel) {
         color = DarkBg
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Top Bar
             TopBar(
                 viewModel = viewModel,
                 onOpenSettings = { showConfigDialog = true }
             )
 
-            // Main Tab Buttons
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -88,7 +86,6 @@ fun TopBar(viewModel: TeslaViewModel, onOpenSettings: () -> Unit) {
             Text("Monitor & Guardian", fontSize = 11.sp, color = SubText)
         }
 
-        // 아이콘 3개 그룹 (🔄 갱신 | ⚡ 상태 | ⚙️ 설정)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             IconButton(
                 onClick = { viewModel.refreshData() },
