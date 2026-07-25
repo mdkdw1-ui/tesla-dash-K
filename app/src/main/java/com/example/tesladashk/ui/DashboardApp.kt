@@ -47,7 +47,7 @@ fun formatAddress(address: String?): String {
         .trim()
 }
 
-class DashboardViewModel : ViewModel() {
+class TeslaViewModel : ViewModel() {
     private var lastBatteryLevel: Int? = null
     val historyList = mutableStateListOf<StatusHistoryItem>()
 
@@ -89,8 +89,10 @@ class DashboardViewModel : ViewModel() {
     }
 }
 
+typealias DashboardViewModel = TeslaViewModel
+
 @Composable
-fun DashboardApp(viewModel: DashboardViewModel = viewModel()) {
+fun DashboardApp(viewModel: TeslaViewModel = viewModel()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
