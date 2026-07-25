@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.tesladashk.ui.components.ConfigDialog
 import com.example.tesladashk.ui.screens.*
 import com.example.tesladashk.ui.theme.*
 import com.example.tesladashk.viewmodel.TeslaViewModel
@@ -21,6 +22,11 @@ import com.example.tesladashk.viewmodel.TeslaViewModel
 fun DashboardApp(viewModel: TeslaViewModel) {
     var mainTab by remember { mutableStateOf(0) } // 0: 테슬라 모니터, 1: 감시 가디언
     var subTab by remember { mutableStateOf(0) }  // 0: 차량 정보, 1: 주행 지도, 2: 월간 리포트, 3: 배터리
+    var showConfigDialog by remember { mutableStateOf(false) }
+
+    if (showConfigDialog) {
+        ConfigDialog(viewModel = viewModel, onDismiss = { showConfigDialog = false })
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -28,7 +34,10 @@ fun DashboardApp(viewModel: TeslaViewModel) {
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Top Bar
-            TopBar(viewModel = viewModel)
+            TopBar(
+                viewModel = viewModel,
+                onOpenSettings = { showConfigDialog = true }
+            )
 
             // Main Tab Buttons
             Row(
@@ -63,7 +72,7 @@ fun DashboardApp(viewModel: TeslaViewModel) {
 }
 
 @Composable
-fun TopBar(viewModel: TeslaViewModel) {
+fun TopBar(viewModel: TeslaViewModel, onOpenSettings: () -> Unit) {
     val isRefreshing by viewModel.isRefreshing.collectAsState()
 
     Row(
@@ -78,6 +87,8 @@ fun TopBar(viewModel: TeslaViewModel) {
             Text("Tesla Command Hub", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PrimaryText)
             Text("Monitor & Guardian", fontSize = 11.sp, color = SubText)
         }
+
+        // 아이콘 3개 그룹 (🔄 갱신 | ⚡ 상태 | ⚙️ 설정)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             IconButton(
                 onClick = { viewModel.refreshData() },
@@ -87,6 +98,26 @@ fun TopBar(viewModel: TeslaViewModel) {
                     .background(Color(0xFF1E293B))
             ) {
                 Text(if (isRefreshing) "⏳" else "🔄", fontSize = 16.sp)
+            }
+
+            IconButton(
+                onClick = { viewModel.refreshData() },
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF1E293B))
+            ) {
+                Text("⚡", fontSize = 16.sp)
+            }
+
+            IconButton(
+                onClick = onOpenSettings,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF1E293B))
+            ) {
+                Text("⚙️", fontSize = 16.sp)
             }
         }
     }

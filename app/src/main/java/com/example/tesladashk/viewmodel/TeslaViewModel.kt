@@ -16,31 +16,24 @@ class TeslaViewModel : ViewModel() {
 
     private val _config = MutableStateFlow(ConfigState())
     val config: StateFlow<ConfigState> = _config.asStateFlow()
-    val configState: StateFlow<ConfigState> = _config.asStateFlow()
 
     private val _vehicleState = MutableStateFlow(VehicleState())
     val vehicleState: StateFlow<VehicleState> = _vehicleState.asStateFlow()
 
     private val _trips = MutableStateFlow<List<TripItem>>(emptyList())
     val trips: StateFlow<List<TripItem>> = _trips.asStateFlow()
-    val tripsState: StateFlow<List<TripItem>> = _trips.asStateFlow()
 
     private val _selectedTrip = MutableStateFlow<TripItem?>(null)
     val selectedTrip: StateFlow<TripItem?> = _selectedTrip.asStateFlow()
 
     private val _logs = MutableStateFlow<List<String>>(emptyList())
     val logs: StateFlow<List<String>> = _logs.asStateFlow()
-    val logsState: StateFlow<List<String>> = _logs.asStateFlow()
 
     private val _isGuardianActive = MutableStateFlow(false)
     val isGuardianActive: StateFlow<Boolean> = _isGuardianActive.asStateFlow()
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
-
-    private val _accessToken = MutableStateFlow(TeslaApi.DEFAULT_ACCESS_TOKEN)
-    val accessToken: String get() = _accessToken.value
-    val accessTokenState: StateFlow<String> = _accessToken.asStateFlow()
 
     init {
         addLog("[시스템] TeslaViewModel 준비 완료")
@@ -57,15 +50,30 @@ class TeslaViewModel : ViewModel() {
 
     fun toggleGuardian(active: Boolean = !_isGuardianActive.value) {
         _isGuardianActive.value = active
-        addLog("[가디언] 감시 모드 가디언 ${if (_isGuardianActive.value) "활성화" else "비활성화"}")
+        addLog("[가디언] 감시 모드 ${if (_isGuardianActive.value) "활성화" else "비활성화"}")
     }
 
-    fun selectTrip(trip: TripItem) {
-        _selectedTrip.value = trip
-    }
-
+    // 🔄 갱신 버튼 하나로 sync.js 실행 및 Supabase 데이터 가져오기 동시 수행
     fun refreshData() {
-        syncWithSupabase()
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            addLog("[갱신 요청] sync.js 백그라운드 실행 및 Supabase 최신 데이터 수신 시작...")
+
+            val cfg = _config.value
+            if (cfg.ghToken.isNotBlank()) {
+                val ghResp = ApiClient.triggerGitHubSync(cfg.ghToken)
+                if (ghResp.isSuccess) {
+                    addLog("[GitHub] sync.js 실행 명령 전송 완료")
+                } else {
+                    addLog("[GitHub] sync.js 실행 전송 스킵/실패: ${ghResp.errorMessage}")
+                }
+            } else {
+                addLog("[GitHub] GitHub Token 미설정 (sync.js 실행 생략)")
+            }
+
+            syncWithSupabaseInternal()
+            _isRefreshing.value = false
+        }
     }
 
     fun saveConfig(
@@ -84,128 +92,84 @@ class TeslaViewModel : ViewModel() {
             vehicleId = vehicleId.trim(),
             ntfyTopic = ntfyTopic.trim()
         )
-        addLog("[설정] API 및 DB 설정 정보가 저장되었습니다.")
-        syncWithSupabase()
+        addLog("[설정] API 및 커스텀 설정 저장이 완료되었습니다.")
+        refreshData()
     }
 
-    fun updateConfig(
-        kakaoKey: String = "",
-        supabaseUrl: String = "",
-        supabaseKey: String = "",
-        ghToken: String = "",
-        vehicleId: String = "",
-        ntfyTopic: String = ""
-    ) {
-        saveConfig(kakaoKey, supabaseUrl, supabaseKey, ghToken, vehicleId, ntfyTopic)
-    }
+    private suspend fun syncWithSupabaseInternal() {
+        val cfg = _config.value
+        if (cfg.supabaseUrl.isBlank() || cfg.supabaseKey.isBlank()) {
+            addLog("[동기화 실패] Supabase URL/Key 설정 필요")
+            return
+        }
 
-    fun updateConfig(newConfig: ConfigState) {
-        _config.value = newConfig
-        addLog("[설정] API 및 DB 설정 정보가 저장되었습니다.")
-        syncWithSupabase()
-    }
+        val baseUrl = cfg.supabaseUrl.split("/rest/v1")[0].removeSuffix("/")
 
-    fun syncWithSupabase() {
-        viewModelScope.launch {
-            _isRefreshing.value = true
-            val cfg = _config.value
-            if (cfg.supabaseUrl.isBlank() || cfg.supabaseKey.isBlank()) {
-                addLog("[동기화 실패] Supabase URL 또는 Key가 설정되지 않았습니다.")
-                _isRefreshing.value = false
-                return@launch
-            }
-
-            val baseUrl = cfg.supabaseUrl.split("/rest/v1")[0].removeSuffix("/")
-            addLog("[동기화] Supabase vehicle 및 driving 데이터 수신 중...")
-
-            // 1. vehicle 테이블 (차량 상태)
-            val vehicleUrl = "$baseUrl/rest/v1/vehicle?select=*&order=updated_at.desc&limit=1"
-            val vehicleResp = ApiClient.executeSupabaseGet(vehicleUrl, cfg.supabaseKey)
-
-            if (vehicleResp.isSuccess) {
-                try {
-                    val arr = JSONArray(vehicleResp.body)
-                    if (arr.length() > 0) {
-                        val obj = arr.getJSONObject(0)
-                        val stateStr = obj.optString("state", "online")
-                        val formattedStatus = when (stateStr.lowercase()) {
-                            "online" -> "현재: 대기 중 (Online)"
-                            "driving" -> "현재: 주행 중 (Driving)"
-                            "charging" -> "현재: 충전 중 (Charging)"
-                            "offline" -> "현재: 오프라인 (Offline)"
-                            else -> "현재: $stateStr"
-                        }
-                        _vehicleState.value = VehicleState(
-                            statusText = formattedStatus,
-                            batteryLevel = obj.optInt("battery_level", 0),
-                            odometer = obj.optInt("odometer", 0),
-                            outsideTemp = obj.optDouble("outside_temp", 22.0).toFloat(),
-                            parkDurationStr = obj.optString("park_duration_str", "상태 수신 완료"),
-                            tpmsFl = obj.optDouble("tpms_fl", 0.0).toFloat(),
-                            tpmsFr = obj.optDouble("tpms_fr", 0.0).toFloat(),
-                            tpmsRl = obj.optDouble("tpms_rl", 0.0).toFloat(),
-                            tpmsRr = obj.optDouble("tpms_rr", 0.0).toFloat()
-                        )
-                    }
-                } catch (e: Exception) {
-                    addLog("[차량상태 파싱 오류] ${e.localizedMessage}")
+        // 1. vehicle
+        val vehicleUrl = "$baseUrl/rest/v1/vehicle?select=*&order=updated_at.desc&limit=1"
+        val vehicleResp = ApiClient.executeSupabaseGet(vehicleUrl, cfg.supabaseKey)
+        if (vehicleResp.isSuccess) {
+            try {
+                val arr = JSONArray(vehicleResp.body)
+                if (arr.length() > 0) {
+                    val obj = arr.getJSONObject(0)
+                    _vehicleState.value = VehicleState(
+                        statusText = "현재: " + obj.optString("state", "online"),
+                        batteryLevel = obj.optInt("battery_level", 0),
+                        odometer = obj.optInt("odometer", 0),
+                        outsideTemp = obj.optDouble("outside_temp", 22.0).toFloat(),
+                        parkDurationStr = obj.optString("park_duration_str", "상태 수신 완료"),
+                        tpmsFl = obj.optDouble("tpms_fl", 41.0).toFloat(),
+                        tpmsFr = obj.optDouble("tpms_fr", 41.0).toFloat(),
+                        tpmsRl = obj.optDouble("tpms_rl", 41.0).toFloat(),
+                        tpmsRr = obj.optDouble("tpms_rr", 41.0).toFloat()
+                    )
                 }
+            } catch (e: Exception) {
+                addLog("[차량 파싱 오류] ${e.localizedMessage}")
             }
+        }
 
-            // 2. driving 테이블 (주행 기록 최신 30건)
-            val drivingUrl = "$baseUrl/rest/v1/driving?select=*&order=created_at.desc&limit=30"
-            val drivingResp = ApiClient.executeSupabaseGet(drivingUrl, cfg.supabaseKey)
+        // 2. driving
+        val drivingUrl = "$baseUrl/rest/v1/driving?select=*&order=created_at.desc&limit=50"
+        val drivingResp = ApiClient.executeSupabaseGet(drivingUrl, cfg.supabaseKey)
+        if (drivingResp.isSuccess) {
+            try {
+                val arr = JSONArray(drivingResp.body)
+                val parsed = mutableListOf<TripItem>()
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    val rawCreated = obj.optString("created_at", "")
+                    val formattedDate = rawCreated.replace("T", " ").take(16).ifEmpty { "2026-07-22" }
+                    val sAddr = obj.optString("start_address", "출발지")
+                    val eAddr = obj.optString("end_address", "도착지")
+                    val mKm = obj.optDouble("move_km", 0.0)
+                    val uBat = obj.optDouble("use_battery", 0.0)
+                    val dMin = obj.optInt("driving_time", 0)
 
-            if (drivingResp.isSuccess) {
-                try {
-                    val arr = JSONArray(drivingResp.body)
-                    val parsedTrips = mutableListOf<TripItem>()
-
-                    for (i in 0 until arr.length()) {
-                        val item = arr.getJSONObject(i)
-                        
-                        val rawCreated = item.optString("created_at", "")
-                        val formattedDate = rawCreated.replace("T", " ").take(16).ifEmpty { "날짜 미상" }
-                        val startAddr = item.optString("start_address", "출발지 미기재")
-                        val endAddr = item.optString("end_address", "도착지 미기재")
-                        val moveK = item.optDouble("move_km", 0.0)
-                        val useBat = item.optDouble("use_battery", 0.0)
-                        val durMin = item.optInt("driving_time", 0)
-                        val locJson = item.optString("location_list", "[]")
-
-                        parsedTrips.add(
-                            TripItem(
-                                id = item.optString("id", "$i"),
-                                timeStr = formattedDate,
-                                startDong = startAddr,
-                                endDong = endAddr,
-                                moveKm = moveK,
-                                durationMin = durMin,
-                                useBattery = useBat,
-                                locationListJson = locJson,
-                                date = formattedDate,
-                                startAddress = startAddr,
-                                endAddress = endAddr,
-                                distanceKm = moveK,
-                                batteryUsed = useBat,
-                                driveTimeMin = durMin
-                            )
+                    parsed.add(
+                        TripItem(
+                            id = obj.optString("id", "$i"),
+                            timeStr = formattedDate,
+                            startDong = sAddr,
+                            endDong = eAddr,
+                            moveKm = mKm,
+                            durationMin = dMin,
+                            useBattery = uBat,
+                            date = formattedDate,
+                            startAddress = sAddr,
+                            endAddress = eAddr,
+                            distanceKm = mKm,
+                            batteryUsed = uBat,
+                            driveTimeMin = dMin
                         )
-                    }
-
-                    _trips.value = parsedTrips
-                    if (parsedTrips.isNotEmpty() && _selectedTrip.value == null) {
-                        _selectedTrip.value = parsedTrips[0]
-                    }
-                    addLog("[주행기록 동기화 성공] 최신 ${parsedTrips.size}건 수신 완료")
-                } catch (e: Exception) {
-                    addLog("[주행기록 파싱 오류] ${e.localizedMessage}")
+                    )
                 }
-            } else {
-                addLog("[주행기록 수신 실패] Code ${drivingResp.statusCode}")
+                _trips.value = parsed
+                addLog("[주행 동기화] 최신 ${parsed.size}건 동기화 성공")
+            } catch (e: Exception) {
+                addLog("[주행 파싱 오류] ${e.localizedMessage}")
             }
-
-            _isRefreshing.value = false
         }
     }
 }
