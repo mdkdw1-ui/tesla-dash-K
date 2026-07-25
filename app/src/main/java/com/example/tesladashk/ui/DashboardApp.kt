@@ -1,170 +1,267 @@
 package com.example.tesladashk.ui
 
+import android.annotation.SuppressLint
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.tesladashk.ui.components.ConfigDialog
-import com.example.tesladashk.ui.screens.*
-import com.example.tesladashk.ui.theme.*
-import com.example.tesladashk.viewmodel.TeslaViewModel
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+enum class VehicleStatusType {
+    DRIVING, PARKED, CHARGING, SLEEP, UNKNOWN
+}
+
+data class StatusHistoryItem(
+    val timestamp: String,
+    val type: VehicleStatusType,
+    val batteryLevel: Int,
+    val address: String,
+    val detailText: String = ""
+)
+
+fun formatAddress(address: String?): String {
+    if (address.isNullOrBlank()) return ""
+    return address
+        .replace("서울특별시 ", "")
+        .replace("서울특별시", "")
+        .replace("경기도 ", "")
+        .replace("경기도", "")
+        .replace("고양시 ", "")
+        .replace("고양시", "")
+        .trim()
+}
+
+class DashboardViewModel : ViewModel() {
+    private var lastBatteryLevel: Int? = null
+    val historyList = mutableStateListOf<StatusHistoryItem>()
+
+    fun updateVehicleState(
+        currentBattery: Int,
+        isDriving: Boolean,
+        rawAddress: String,
+        currentKm: Double
+    ) {
+        val cleanAddress = formatAddress(rawAddress)
+        val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+
+        val statusType = when {
+            lastBatteryLevel != null && (currentBattery - lastBatteryLevel!!) >= 1 -> {
+                VehicleStatusType.CHARGING
+            }
+            isDriving -> VehicleStatusType.DRIVING
+            else -> VehicleStatusType.PARKED
+        }
+
+        val batteryDiff = lastBatteryLevel?.let { currentBattery - it } ?: 0
+        val detail = if (statusType == VehicleStatusType.CHARGING && batteryDiff > 0) {
+            "+${batteryDiff}% 충전 중"
+        } else {
+            "${currentKm}km"
+        }
+
+        lastBatteryLevel = currentBattery
+
+        val newItem = StatusHistoryItem(
+            timestamp = currentTime,
+            type = statusType,
+            batteryLevel = currentBattery,
+            address = cleanAddress,
+            detailText = detail
+        )
+        
+        historyList.add(0, newItem)
+    }
+}
 
 @Composable
-fun DashboardApp(viewModel: TeslaViewModel) {
-    var mainTab by remember { mutableStateOf(0) }
-    var subTab by remember { mutableStateOf(0) }
-    var showConfigDialog by remember { mutableStateOf(false) }
-
-    if (showConfigDialog) {
-        ConfigDialog(viewModel = viewModel, onDismiss = { showConfigDialog = false })
-    }
-
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = DarkBg
+fun DashboardApp(viewModel: DashboardViewModel = viewModel()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            TopBar(
-                viewModel = viewModel,
-                onOpenSettings = { showConfigDialog = true }
-            )
+        KakaoMapView(
+            latitude = 37.6581,
+            longitude = 126.8320,
+            pathPointsJson = "[{\"lat\": 37.6581, \"lng\": 126.8320}, {\"lat\": 37.6600, \"lng\": 126.8350}]",
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        )
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                MainTabButton("🚗 테슬라 모니터", isSelected = mainTab == 0, modifier = Modifier.weight(1f)) {
-                    mainTab = 0
-                }
-                MainTabButton("🛡️ 감시 가디언", isSelected = mainTab == 1, modifier = Modifier.weight(1f)) {
-                    mainTab = 1
-                }
-            }
+        CompactHistoryList(
+            historyItems = viewModel.historyList,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        )
+    }
+}
 
-            if (mainTab == 0) {
-                SubTabBar(selectedTab = subTab) { subTab = it }
-                Box(modifier = Modifier.fillMaxSize()) {
-                    when (subTab) {
-                        0 -> MonitorScreen(viewModel)
-                        1 -> DrivingMapScreen(viewModel)
-                        2 -> MonthlyReportScreen(viewModel)
-                        3 -> BatteryScreen(viewModel)
-                    }
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun KakaoMapView(
+    appKey: String = "YOUR_KAKAO_APP_KEY",
+    latitude: Double,
+    longitude: Double,
+    pathPointsJson: String = "[]",
+    modifier: Modifier = Modifier
+) {
+    val htmlContent = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8"/>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=$appKey"></script>
+            <style>
+                html, body, #map { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #121212; }
+            </style>
+        </head>
+        <body>
+            <div id="map"></div>
+            <script>
+                var container = document.getElementById('map');
+                var options = {
+                    center: new kakao.maps.LatLng($latitude, $longitude),
+                    level: 4
+                };
+                var mapInstance = new kakao.maps.Map(container, options);
+
+                var markerPosition = new kakao.maps.LatLng($latitude, $longitude);
+                var marker = new kakao.maps.Marker({ position: markerPosition });
+                marker.setMap(mapInstance);
+
+                var rawPath = $pathPointsJson;
+                if (rawPath && rawPath.length > 0) {
+                    var linePath = rawPath.map(function(pt) {
+                        return new kakao.maps.LatLng(pt.lat, pt.lng);
+                    });
+                    var polyline = new kakao.maps.Polyline({
+                        path: linePath,
+                        strokeWeight: 5,
+                        strokeColor: '#FF0055',
+                        strokeOpacity: 0.8,
+                        strokeStyle: 'solid'
+                    });
+                    polyline.setMap(mapInstance);
                 }
-            } else {
-                GuardianScreen(viewModel)
+            </script>
+        </body>
+        </html>
+    """.trimIndent()
+
+    AndroidView(
+        factory = { context ->
+            WebView(context).apply {
+                settings.javaScriptEnabled = true
+                settings.domStorageEnabled = true
+                webViewClient = WebViewClient()
+                loadDataWithBaseURL("https://dapi.kakao.com", htmlContent, "text/html", "UTF-8", null)
             }
+        },
+        update = { webView ->
+            webView.loadDataWithBaseURL("https://dapi.kakao.com", htmlContent, "text/html", "UTF-8", null)
+        },
+        modifier = modifier
+    )
+}
+
+@Composable
+fun CompactHistoryList(
+    historyItems: List<StatusHistoryItem>,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        items(historyItems) { item ->
+            CompactHistoryRow(item)
         }
     }
 }
 
 @Composable
-fun TopBar(viewModel: TeslaViewModel, onOpenSettings: () -> Unit) {
-    val isRefreshing by viewModel.isRefreshing.collectAsState()
+fun CompactHistoryRow(item: StatusHistoryItem) {
+    val badgeColor = when (item.type) {
+        VehicleStatusType.CHARGING -> Color(0xFF00E676)
+        VehicleStatusType.DRIVING -> Color(0xFF29B6F6)
+        VehicleStatusType.PARKED -> Color(0xFFFFB74D)
+        else -> Color.Gray
+    }
+
+    val badgeText = when (item.type) {
+        VehicleStatusType.CHARGING -> "충전"
+        VehicleStatusType.DRIVING -> "주행"
+        VehicleStatusType.PARKED -> "주차"
+        else -> "대기"
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(CardBg)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .background(Color(0xFF1E1E1E), shape = RoundedCornerShape(4.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column {
-            Text("Tesla Command Hub", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PrimaryText)
-            Text("Monitor & Guardian", fontSize = 11.sp, color = SubText)
+        Text(
+            text = item.timestamp,
+            color = Color.LightGray,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.width(42.dp)
+        )
+
+        Box(
+            modifier = Modifier
+                .background(badgeColor.copy(alpha = 0.2f), RoundedCornerShape(3.dp))
+                .padding(horizontal = 5.dp, vertical = 1.dp)
+        ) {
+            Text(
+                text = badgeText,
+                color = badgeColor,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            IconButton(
-                onClick = { viewModel.refreshData() },
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF1E293B))
-            ) {
-                Text(if (isRefreshing) "⏳" else "🔄", fontSize = 16.sp)
-            }
+        Spacer(modifier = Modifier.width(6.dp))
 
-            IconButton(
-                onClick = { viewModel.refreshData() },
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF1E293B))
-            ) {
-                Text("⚡", fontSize = 16.sp)
-            }
+        Text(
+            text = item.address,
+            color = Color.White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            modifier = Modifier.weight(1f)
+        )
 
-            IconButton(
-                onClick = onOpenSettings,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF1E293B))
-            ) {
-                Text("⚙️", fontSize = 16.sp)
-            }
-        }
-    }
-}
+        Spacer(modifier = Modifier.width(4.dp))
 
-@Composable
-fun MainTabButton(title: String, isSelected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (isSelected) AccentBlue else Color(0xFF1E293B))
-            .clickable { onClick() }
-            .padding(vertical = 12.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(title, color = PrimaryText, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-    }
-}
-
-@Composable
-fun SubTabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
-    val tabs = listOf("차량 정보", "주행 지도", "월간 리포트", "배터리")
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(CardBg)
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        tabs.forEachIndexed { index, title ->
-            val isSelected = selectedTab == index
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (isSelected) AccentBlue else Color.Transparent)
-                    .clickable { onTabSelected(index) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    title,
-                    fontSize = 12.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                    color = if (isSelected) PrimaryText else SubText
-                )
-            }
-        }
+        Text(
+            text = "${item.batteryLevel}% ${item.detailText}".trim(),
+            color = Color(0xFFFFD54F),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
