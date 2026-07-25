@@ -35,7 +35,8 @@ class TeslaViewModel : ViewModel() {
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     private val _accessToken = MutableStateFlow(TeslaApi.DEFAULT_ACCESS_TOKEN)
-    val accessToken: StateFlow<String> = _accessToken.asStateFlow()
+    val accessToken: String get() = _accessToken.value
+    val accessTokenState: StateFlow<String> = _accessToken.asStateFlow()
 
     init {
         addLog("[시스템] TeslaViewModel 준비 완료")
