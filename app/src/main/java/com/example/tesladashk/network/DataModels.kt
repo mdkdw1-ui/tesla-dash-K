@@ -19,12 +19,21 @@ data class VehicleState(
 
 data class TripItem(
     val id: String = "",
-    val date: String = "",
-    val startAddress: String = "출발지 정보 없음",
-    val endAddress: String = "도착지 정보 없음",
-    val distanceKm: Double = 0.0,
-    val batteryUsed: Double = 0.0,
-    val driveTimeMin: Int = 0,
+    val timeStr: String = "",
+    val date: String = timeStr,
+    val startDong: String = "출발지 미기재",
+    val startAddress: String = startDong,
+    val endDong: String = "도착지 미기재",
+    val endAddress: String = endDong,
+    val moveKm: Double = 0.0,
+    val distanceKm: Double = moveKm,
+    val durationMin: Int = 0,
+    val driveTimeMin: Int = durationMin,
+    val useBattery: Double = 0.0,
+    val batteryUsed: Double = useBattery,
+    val startBat: Int = 0,
+    val endBat: Int = 0,
+    val odometer: Int = 0,
     val locationListJson: String = "[]"
 )
 

@@ -160,20 +160,31 @@ class TeslaViewModel : ViewModel() {
                     for (i in 0 until arr.length()) {
                         val item = arr.getJSONObject(i)
                         
-                        // 날짜 포맷 변환 (2025-12-18T10:44:44 -> 2025.12.18 10:44)
                         val rawCreated = item.optString("created_at", "")
                         val formattedDate = rawCreated.replace("T", " ").take(16).ifEmpty { "날짜 미상" }
+                        val startAddr = item.optString("start_address", "출발지 미기재")
+                        val endAddr = item.optString("end_address", "도착지 미기재")
+                        val moveK = item.optDouble("move_km", 0.0)
+                        val useBat = item.optDouble("use_battery", 0.0)
+                        val durMin = item.optInt("driving_time", 0)
+                        val locJson = item.optString("location_list", "[]")
 
                         parsedTrips.add(
                             TripItem(
                                 id = item.optString("id", "$i"),
+                                timeStr = formattedDate,
                                 date = formattedDate,
-                                startAddress = item.optString("start_address", "출발지 미기재"),
-                                endAddress = item.optString("end_address", "도착지 미기재"),
-                                distanceKm = item.optDouble("move_km", 0.0),
-                                batteryUsed = item.optDouble("use_battery", 0.0),
-                                driveTimeMin = item.optInt("driving_time", 0),
-                                locationListJson = item.optString("location_list", "[]")
+                                startDong = startAddr,
+                                startAddress = startAddr,
+                                endDong = endAddr,
+                                endAddress = endAddr,
+                                moveKm = moveK,
+                                distanceKm = moveK,
+                                durationMin = durMin,
+                                driveTimeMin = durMin,
+                                useBattery = useBat,
+                                batteryUsed = useBat,
+                                locationListJson = locJson
                             )
                         )
                     }
