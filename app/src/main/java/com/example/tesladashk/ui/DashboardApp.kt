@@ -18,10 +18,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
-
 import com.example.tesladashk.viewmodel.TeslaViewModel
 
-// 1. 차량 상태 모델 정의
+// ==========================================
+// 1. 코틀린 데이터 모델
+// ==========================================
 enum class VehicleStatusType {
     DRIVING, PARKED, CHARGING, SLEEP, UNKNOWN
 }
@@ -34,7 +35,9 @@ data class StatusHistoryItem(
     val detailText: String = ""
 )
 
+// ==========================================
 // 2. 주소 정제 함수 (서울특별시, 경기도, 고양시 제거)
+// ==========================================
 fun formatAddress(address: String?): String {
     if (address.isNullOrBlank()) return ""
     return address
@@ -47,24 +50,26 @@ fun formatAddress(address: String?): String {
         .trim()
 }
 
-// 3. 메인 화면 Composable
+// ==========================================
+// 3. 코틀린 Jetpack Compose 메인 대시보드 화면
+// ==========================================
 @Composable
-fun DashboardApp(viewModel: TeslaViewModel = viewModel()) {
-    // 히스토리 목록 데이터 상태
-    val historyList = remember {
-        mutableStateListOf(
-            StatusHistoryItem("14:20", VehicleStatusType.PARKED, 78, "식사동 123-4", "주차 중"),
-            StatusHistoryItem("12:10", VehicleStatusType.CHARGING, 75, "풍동 456", "+15% 충전"),
-            StatusHistoryItem("10:00", VehicleStatusType.DRIVING, 60, "마두동 789", "12.5km")
+fun DashboardApp(
+    viewModel: TeslaViewModel = viewModel(),
+    historyItems: List<StatusHistoryItem> = remember {
+        listOf(
+            StatusHistoryItem("14:20", VehicleStatusType.PARKED, 78, formatAddress("경기도 고양시 식사동 123-4"), "주차 중"),
+            StatusHistoryItem("12:10", VehicleStatusType.CHARGING, 75, formatAddress("경기도 고양시 풍동 456"), "+15% 충전"),
+            StatusHistoryItem("10:00", VehicleStatusType.DRIVING, 60, formatAddress("서울특별시 마두동 789"), "12.5km")
         )
     }
-
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        // 상단 카카오맵
+        // 상단 카카오맵 지도뷰 (WebView)
         KakaoMapView(
             latitude = 37.6581,
             longitude = 126.8320,
@@ -74,9 +79,9 @@ fun DashboardApp(viewModel: TeslaViewModel = viewModel()) {
                 .weight(1f)
         )
 
-        // 하단 콤팩트 상태 히스토리
+        // 하단 상태 히스토리 리스트
         CompactHistoryList(
-            historyItems = historyList,
+            historyItems = historyItems,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -84,7 +89,9 @@ fun DashboardApp(viewModel: TeslaViewModel = viewModel()) {
     }
 }
 
-// 4. WebView 카카오맵 Component
+// ==========================================
+// 4. 안드로이드 WebView 카카오맵 연동 컴포넌트
+// ==========================================
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun KakaoMapView(
@@ -154,7 +161,9 @@ fun KakaoMapView(
     )
 }
 
-// 5. 히스토리 목록 UI
+// ==========================================
+// 5. Compose 히스토리 리스트 UI
+// ==========================================
 @Composable
 fun CompactHistoryList(
     historyItems: List<StatusHistoryItem>,
@@ -172,7 +181,6 @@ fun CompactHistoryList(
     }
 }
 
-// 6. 히스토리 단일 행 UI
 @Composable
 fun CompactHistoryRow(item: StatusHistoryItem) {
     val badgeColor = when (item.type) {
