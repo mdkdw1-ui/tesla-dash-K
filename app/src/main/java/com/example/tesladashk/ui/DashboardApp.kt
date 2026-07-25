@@ -14,13 +14,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.tesladashk.ui.screens.*
+import com.example.tesladashk.ui.theme.*
 import com.example.tesladashk.viewmodel.TeslaViewModel
-
-private val DarkBg = Color(0xFF0B0F17)
-private val CardBg = Color(0xFF131B2E)
-private val AccentBlue = Color(0xFF2563EB)
-private val PrimaryText = Color(0xFFF1F5F9)
-private val SubText = Color(0xFF94A3B8)
 
 @Composable
 fun DashboardApp(viewModel: TeslaViewModel) {
@@ -51,10 +46,7 @@ fun DashboardApp(viewModel: TeslaViewModel) {
             }
 
             if (mainTab == 0) {
-                // Sub Tab Bar (차량 정보 | 주행 지도 | 월간 리포트 | 배터리)
                 SubTabBar(selectedTab = subTab) { subTab = it }
-
-                // Sub Screen Content
                 Box(modifier = Modifier.fillMaxSize()) {
                     when (subTab) {
                         0 -> MonitorScreen(viewModel)
@@ -64,13 +56,7 @@ fun DashboardApp(viewModel: TeslaViewModel) {
                     }
                 }
             } else {
-                // Guardian Screen placeholder or implementation
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("가디언 모드가 활성화되어 차량 상태를 주기적으로 감시합니다.", color = PrimaryText)
-                }
+                GuardianScreen(viewModel)
             }
         }
     }
@@ -129,7 +115,7 @@ fun SubTabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFF131B2E))
+            .background(CardBg)
             .padding(4.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
