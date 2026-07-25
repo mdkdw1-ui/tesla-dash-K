@@ -1,6 +1,8 @@
 package com.example.tesladashk.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.content.Context
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.tesladashk.network.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,7 +15,9 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-class TeslaViewModel : ViewModel() {
+class TeslaViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val prefs = application.getSharedPreferences("tesla_dash_prefs", Context.MODE_PRIVATE)
 
     private val _config = MutableStateFlow(ConfigState())
     val config: StateFlow<ConfigState> = _config.asStateFlow()
@@ -34,7 +38,22 @@ class TeslaViewModel : ViewModel() {
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     init {
+        loadConfigFromPrefs()
         addLog("[시스템] TeslaViewModel 준비 완료")
+    }
+
+    private fun loadConfigFromPrefs() {
+        val kakaoKey = prefs.getString("kakaoKey", "") ?: ""
+        val supabaseUrl = prefs.getString("supabaseUrl", "") ?: ""
+        val supabaseKey = prefs.getString("supabaseKey", "") ?: ""
+        val ghToken = prefs.getString("ghToken", "") ?: ""
+        val vehicleId = prefs.getString("vehicleId", "") ?: ""
+        val ntfyTopic = prefs.getString("ntfyTopic", "") ?: ""
+
+        _config.value = ConfigState(kakaoKey, supabaseUrl, supabaseKey, ghToken, vehicleId, ntfyTopic)
+        if (supabaseUrl.isNotBlank() && supabaseKey.isNotBlank()) {
+            refreshData()
+        }
     }
 
     fun addLog(msg: String) {
@@ -76,24 +95,64 @@ class TeslaViewModel : ViewModel() {
         vehicleId: String,
         ntfyTopic: String
     ) {
-        _config.value = ConfigState(
-            kakaoKey = kakaoKey.trim(),
-            supabaseUrl = supabaseUrl.trim().removeSuffix("/"),
-            supabaseKey = supabaseKey.trim(),
-            ghToken = ghToken.trim(),
-            vehicleId = vehicleId.trim(),
-            ntfyTopic = ntfyTopic.trim()
-        )
+        val cleanUrl = supabaseUrl.trim().removeSuffix("/")
+        val cleanKey = supabaseKey.trim()
+        val cleanKakao = kakaoKey.trim()
+        val cleanGh = ghToken.trim()
+        val cleanVid = vehicleId.trim()
+        val cleanNtfy = ntfyTopic.trim()
+
+        prefs.edit().apply {
+            putString("kakaoKey", cleanKakao)
+            putString("supabaseUrl", cleanUrl)
+            putString("supabaseKey", cleanKey)
+            putString("ghToken", cleanGh)
+            putString("vehicleId", cleanVid)
+            putString("ntfyTopic", cleanNtfy)
+            apply()
+        }
+
+        _config.value = ConfigState(cleanKakao, cleanUrl, cleanKey, cleanGh, cleanVid, cleanNtfy)
+        addLog("[설정] 설정값이 기기에 영구 저장되었습니다.")
         refreshData()
+    }
+
+    private fun parseToKst(rawStr: String): String {
+        if (rawStr.isBlank()) return "-"
+        val clean = rawStr.replace("Z", "+0000").replace("T", " ")
+        val patterns = listOf(
+            "yyyy-MM-dd HH:mm:ss.SSSSSS",
+            "yyyy-MM-dd HH:mm:ss.SSS",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd HH:mm"
+        )
+        for (pattern in patterns) {
+            try {
+                val sdf = SimpleDateFormat(pattern, Locale.getDefault()).apply {
+                    timeZone = TimeZone.getTimeZone("UTC")
+                }
+                val date = sdf.parse(clean)
+                if (date != null) {
+                    val outSdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).apply {
+                        timeZone = TimeZone.getTimeZone("Asia/Seoul")
+                    }
+                    return outSdf.format(date)
+                }
+            } catch (_: Exception) {}
+        }
+        return rawStr.take(16).replace("T", " ")
     }
 
     private suspend fun syncWithSupabaseInternal() {
         val cfg = _config.value
-        if (cfg.supabaseUrl.isBlank() || cfg.supabaseKey.isBlank()) return
+        if (cfg.supabaseUrl.isBlank() || cfg.supabaseKey.isBlank()) {
+            addLog("[경고] Supabase URL 또는 Key가 설정되지 않았습니다.")
+            return
+        }
 
         val baseUrl = cfg.supabaseUrl.split("/rest/v1")[0].removeSuffix("/")
 
-        // 1. 차량 정보 수신
+        // 1. 차량 상태 정보 수신
         val vehicleUrl = "$baseUrl/rest/v1/vehicle?select=*&order=updated_at.desc&limit=1"
         val vehicleResp = ApiClient.executeSupabaseGet(vehicleUrl, cfg.supabaseKey)
         if (vehicleResp.isSuccess) {
@@ -114,65 +173,116 @@ class TeslaViewModel : ViewModel() {
                     )
                 }
             } catch (e: Exception) {
-                addLog("[차량 파싱 오류] ${e.localizedMessage}")
+                addLog("[차량 상태 파싱 오류] ${e.localizedMessage}")
             }
+        } else {
+            addLog("[차량 상태 조회 실패] HTTP ${vehicleResp.code}")
         }
 
-        // 2. 주행 기록 수신 (300개 제한 및 KST 시차 변환)
-        val drivingUrl = "$baseUrl/rest/v1/driving?select=*&order=created_at.desc&limit=300"
+        val parsedList = mutableListOf<TripItem>()
+
+        // 2. 주행 기록 수신 (최대 1000건)
+        val drivingUrl = "$baseUrl/rest/v1/driving?select=*&order=created_at.desc&limit=1000"
         val drivingResp = ApiClient.executeSupabaseGet(drivingUrl, cfg.supabaseKey)
+        var drivingCount = 0
         if (drivingResp.isSuccess) {
             try {
                 val arr = JSONArray(drivingResp.body)
-                val parsed = mutableListOf<TripItem>()
-
-                val utcFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).apply {
-                    timeZone = TimeZone.getTimeZone("UTC")
-                }
-                val kstFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).apply {
-                    timeZone = TimeZone.getTimeZone("Asia/Seoul")
-                }
-
+                drivingCount = arr.length()
                 for (i in 0 until arr.length()) {
-                    val obj = arr.getJSONObject(i)
-                    val rawCreated = obj.optString("created_at", "")
+                    try {
+                        val obj = arr.getJSONObject(i)
+                        val rawCreated = obj.optString("created_at", obj.optString("start_time", ""))
+                        val kstDateStr = parseToKst(rawCreated)
 
-                    val kstDateStr = try {
-                        val parsedUtc = utcFormat.parse(rawCreated.take(19))
-                        parsedUtc?.let { kstFormat.format(it) } ?: rawCreated.replace("T", " ").take(16)
-                    } catch (e: Exception) {
-                        rawCreated.replace("T", " ").take(16)
-                    }
+                        val sAddr = obj.optString("start_address", obj.optString("start_location", "출발지"))
+                        val eAddr = obj.optString("end_address", obj.optString("end_location", "도착지"))
+                        val mKm = obj.optDouble("move_km", obj.optDouble("distance", 0.0))
+                        val uBat = obj.optDouble("use_battery", obj.optDouble("battery_used", 0.0))
+                        val dMin = obj.optInt("driving_time", obj.optInt("duration_min", 0))
 
-                    val sAddr = obj.optString("start_address", "출발지")
-                    val eAddr = obj.optString("end_address", "도착지")
-                    val mKm = obj.optDouble("move_km", 0.0)
-                    val uBat = obj.optDouble("use_battery", 0.0)
-                    val dMin = obj.optInt("driving_time", 0)
-
-                    parsed.add(
-                        TripItem(
-                            id = obj.optString("id", "$i"),
-                            timeStr = kstDateStr,
-                            startDong = sAddr,
-                            endDong = eAddr,
-                            moveKm = mKm,
-                            durationMin = dMin,
-                            useBattery = uBat,
-                            date = kstDateStr,
-                            startAddress = sAddr,
-                            endAddress = eAddr,
-                            distanceKm = mKm,
-                            batteryUsed = uBat,
-                            driveTimeMin = dMin
+                        parsedList.add(
+                            TripItem(
+                                id = "drive_${obj.optString("id", i.toString())}",
+                                timeStr = kstDateStr,
+                                startDong = sAddr,
+                                endDong = eAddr,
+                                moveKm = mKm,
+                                durationMin = dMin,
+                                useBattery = uBat,
+                                date = kstDateStr,
+                                startAddress = sAddr,
+                                endAddress = eAddr,
+                                distanceKm = mKm,
+                                batteryUsed = uBat,
+                                driveTimeMin = dMin
+                            )
                         )
-                    )
+                    } catch (_: Exception) {}
                 }
-                _trips.value = parsed
-                addLog("[주행 동기화 완료] 최신 ${parsed.size}건 수신 (KST 시차 적용)")
             } catch (e: Exception) {
                 addLog("[주행 파싱 오류] ${e.localizedMessage}")
             }
+        } else {
+            addLog("[주행기록 조회 실패] HTTP ${drivingResp.code}")
         }
+
+        // 3. 충전 기록 수신 (최대 500건) - charging 테이블 연동
+        val chargingUrl = "$baseUrl/rest/v1/charging?select=*&order=created_at.desc&limit=500"
+        val chargingResp = ApiClient.executeSupabaseGet(chargingUrl, cfg.supabaseKey)
+        var chargingCount = 0
+        if (chargingResp.isSuccess) {
+            try {
+                val arr = JSONArray(chargingResp.body)
+                chargingCount = arr.length()
+                for (i in 0 until arr.length()) {
+                    try {
+                        val obj = arr.getJSONObject(i)
+                        val rawCreated = obj.optString("created_at", obj.optString("start_time", ""))
+                        val kstDateStr = parseToKst(rawCreated)
+
+                        val location = obj.optString("address", obj.optString("location", "충전 장소"))
+                        val addedKwh = obj.optDouble("charge_energy_added", obj.optDouble("kwh", 0.0))
+                        val startBat = obj.optInt("start_battery", obj.optInt("start_battery_level", 0))
+                        val endBat = obj.optInt("end_battery", obj.optInt("end_battery_level", 0))
+                        val batDiff = if (endBat > startBat) endBat - startBat else obj.optInt("battery_gained", 0)
+                        val duration = obj.optInt("charge_time_min", obj.optInt("duration_min", 0))
+
+                        val chargeTitle = "⚡ [충전] $location"
+                        val chargeDetail = if (addedKwh > 0) {
+                            "충전량: +${String.format(Locale.US, "%.1f", addedKwh)}kWh ($startBat% ➔ $endBat%)"
+                        } else {
+                            "배터리 $startBat% ➔ $endBat% (+${batDiff}%)"
+                        }
+
+                        parsedList.add(
+                            TripItem(
+                                id = "charge_${obj.optString("id", i.toString())}",
+                                timeStr = kstDateStr,
+                                startDong = chargeTitle,
+                                endDong = chargeDetail,
+                                moveKm = 0.0,
+                                durationMin = duration,
+                                useBattery = -batDiff.toDouble(),
+                                date = kstDateStr,
+                                startAddress = chargeTitle,
+                                endAddress = chargeDetail,
+                                distanceKm = 0.0,
+                                batteryUsed = -batDiff.toDouble(),
+                                driveTimeMin = duration
+                            )
+                        )
+                    } catch (_: Exception) {}
+                }
+            } catch (e: Exception) {
+                addLog("[충전 파싱 오류] ${e.localizedMessage}")
+            }
+        }
+
+        // 4. 주행 + 충전 기록 통합 정렬 (최신순)
+        val sortedList = parsedList.sortedByDescending { it.timeStr }
+        _trips.value = sortedList
+
+        addLog("[동기화 완료] 주행 $drivingCount건, 충전 $chargingCount건 수신 완료 (총 ${sortedList.size}건)")
     }
 }
