@@ -176,19 +176,19 @@ class TeslaViewModel : ViewModel() {
                         parsedTrips.add(
                             TripItem(
                                 id = item.optString("id", "$i"),
-                                date = formattedDate,
-                                startAddress = startAddr,
-                                endAddress = endAddr,
-                                distanceKm = moveK,
-                                batteryUsed = useBat,
-                                driveTimeMin = durMin,
-                                locationListJson = locJson,
+                                timeStr = formattedDate,
                                 startDong = startAddr,
                                 endDong = endAddr,
                                 moveKm = moveK,
                                 durationMin = durMin,
                                 useBattery = useBat,
-                                timeStr = formattedDate
+                                locationListJson = locJson,
+                                date = formattedDate,
+                                startAddress = startAddr,
+                                endAddress = endAddr,
+                                distanceKm = moveK,
+                                batteryUsed = useBat,
+                                driveTimeMin = durMin
                             )
                         )
                     }

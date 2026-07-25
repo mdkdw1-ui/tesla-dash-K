@@ -23,22 +23,22 @@ data class VehicleState(
 
 data class TripItem(
     val id: String = "",
-    val date: String = "",
-    val startAddress: String = "출발지 미기재",
-    val endAddress: String = "도착지 미기재",
-    val distanceKm: Double = 0.0,
-    val batteryUsed: Double = 0.0,
-    val driveTimeMin: Int = 0,
-    val locationListJson: String = "[]",
-    val startDong: String = startAddress,
-    val endDong: String = endAddress,
-    val moveKm: Double = distanceKm,
-    val durationMin: Int = driveTimeMin,
-    val useBattery: Double = batteryUsed,
-    val timeStr: String = date,
+    val timeStr: String = "",
+    val startDong: String = "출발지 미기재",
+    val endDong: String = "도착지 미기재",
+    val moveKm: Double = 0.0,
+    val durationMin: Int = 0,
+    val useBattery: Double = 0.0,
     val startBat: Int = 0,
     val endBat: Int = 0,
-    val odometer: Int = 0
+    val odometer: Int = 0,
+    val locationListJson: String = "[]",
+    val date: String = timeStr,
+    val startAddress: String = startDong,
+    val endAddress: String = endDong,
+    val distanceKm: Double = moveKm,
+    val batteryUsed: Double = useBattery,
+    val driveTimeMin: Int = durationMin
 )
 
 data class ApiResponse(
