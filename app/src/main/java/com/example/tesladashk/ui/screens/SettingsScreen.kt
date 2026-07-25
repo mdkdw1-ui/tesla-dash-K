@@ -29,6 +29,7 @@ fun SettingsScreen(
     var supabaseUrl by remember { mutableStateOf(currentConfig.supabaseUrl) }
     var supabaseKey by remember { mutableStateOf(currentConfig.supabaseKey) }
     var kakaoKey by remember { mutableStateOf(currentConfig.kakaoKey) }
+    var userUid by remember { mutableStateOf(currentConfig.userUid) }
     var vehicleId by remember { mutableStateOf(currentConfig.vehicleId) }
     var ntfyTopic by remember { mutableStateOf(currentConfig.ntfyTopic) }
     var accessToken by remember { mutableStateOf(currentConfig.accessToken) }
@@ -46,7 +47,7 @@ fun SettingsScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "⚙️ 앱 설정 (암호화 저장)",
+                text = "⚙️ 앱 설정",
                 color = Color.White,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
@@ -68,50 +69,37 @@ fun SettingsScreen(
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 
-                Text("🔑 API 및 서버 설정", color = Color(0xFF3B82F6), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("🔑 연동 정보 설정", color = Color(0xFF3B82F6), fontSize = 14.sp, fontWeight = FontWeight.Bold)
 
                 OutlinedTextField(
                     value = supabaseUrl,
                     onValueChange = { supabaseUrl = it },
                     label = { Text("Supabase URL") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF2563EB),
-                        unfocusedBorderColor = Color.DarkGray,
-                        focusedLabelColor = Color(0xFF3B82F6),
-                        unfocusedLabelColor = Color.Gray,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    ),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
                     value = supabaseKey,
                     onValueChange = { supabaseKey = it },
-                    label = { Text("Supabase Key") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF2563EB),
-                        unfocusedBorderColor = Color.DarkGray,
-                        focusedLabelColor = Color(0xFF3B82F6),
-                        unfocusedLabelColor = Color.Gray,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    ),
+                    label = { Text("Supabase Anon Key") },
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = userUid,
+                    onValueChange = { userUid = it },
+                    label = { Text("User UID (예: dwHcQZ...)") },
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
                     value = kakaoKey,
                     onValueChange = { kakaoKey = it },
-                    label = { Text("카카오맵 API Key") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF2563EB),
-                        unfocusedBorderColor = Color.DarkGray,
-                        focusedLabelColor = Color(0xFF3B82F6),
-                        unfocusedLabelColor = Color.Gray,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    ),
+                    label = { Text("카카오맵 REST API Key") },
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -119,44 +107,7 @@ fun SettingsScreen(
                     value = vehicleId,
                     onValueChange = { vehicleId = it },
                     label = { Text("Vehicle ID") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF2563EB),
-                        unfocusedBorderColor = Color.DarkGray,
-                        focusedLabelColor = Color(0xFF3B82F6),
-                        unfocusedLabelColor = Color.Gray,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = ntfyTopic,
-                    onValueChange = { ntfyTopic = it },
-                    label = { Text("Ntfy Topic") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF2563EB),
-                        unfocusedBorderColor = Color.DarkGray,
-                        focusedLabelColor = Color(0xFF3B82F6),
-                        unfocusedLabelColor = Color.Gray,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = accessToken,
-                    onValueChange = { accessToken = it },
-                    label = { Text("Tesla Access Token (선택)") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF2563EB),
-                        unfocusedBorderColor = Color.DarkGray,
-                        focusedLabelColor = Color(0xFF3B82F6),
-                        unfocusedLabelColor = Color.Gray,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    ),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -168,18 +119,18 @@ fun SettingsScreen(
                             supabaseUrl = supabaseUrl,
                             supabaseKey = supabaseKey,
                             kakaoKey = kakaoKey,
+                            userUid = userUid,
                             vehicleId = vehicleId,
                             ntfyTopic = ntfyTopic,
                             accessToken = accessToken
                         )
                         viewModel.saveConfig(context, newConfig)
-                        Toast.makeText(context, "설정이 암호화되어 안전하게 저장되었습니다.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "설정이 저장되었습니다.", Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-                    shape = RoundedCornerShape(10.dp)
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
                 ) {
-                    Text("💾 설정 저장하기 (AES 암호화)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text("💾 설정 저장하기", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
