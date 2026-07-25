@@ -14,27 +14,31 @@ data class VehicleState(
     val batteryLevel: Int = 0,
     val odometer: Int = 0,
     val outsideTemp: Float = 0.0f,
-    val parkDurationStr: String = "-"
+    val parkDurationStr: String = "-",
+    val tpmsFl: Float = 0.0f,
+    val tpmsFr: Float = 0.0f,
+    val tpmsRl: Float = 0.0f,
+    val tpmsRr: Float = 0.0f
 )
 
 data class TripItem(
     val id: String = "",
-    val timeStr: String = "",
-    val date: String = timeStr,
-    val startDong: String = "출발지 미기재",
-    val startAddress: String = startDong,
-    val endDong: String = "도착지 미기재",
-    val endAddress: String = endDong,
-    val moveKm: Double = 0.0,
-    val distanceKm: Double = moveKm,
-    val durationMin: Int = 0,
-    val driveTimeMin: Int = durationMin,
-    val useBattery: Double = 0.0,
-    val batteryUsed: Double = useBattery,
+    val date: String = "",
+    val startAddress: String = "출발지 미기재",
+    val endAddress: String = "도착지 미기재",
+    val distanceKm: Double = 0.0,
+    val batteryUsed: Double = 0.0,
+    val driveTimeMin: Int = 0,
+    val locationListJson: String = "[]",
+    val startDong: String = startAddress,
+    val endDong: String = endAddress,
+    val moveKm: Double = distanceKm,
+    val durationMin: Int = driveTimeMin,
+    val useBattery: Double = batteryUsed,
+    val timeStr: String = date,
     val startBat: Int = 0,
     val endBat: Int = 0,
-    val odometer: Int = 0,
-    val locationListJson: String = "[]"
+    val odometer: Int = 0
 )
 
 data class ApiResponse(

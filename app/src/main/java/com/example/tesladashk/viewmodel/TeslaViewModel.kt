@@ -140,7 +140,11 @@ class TeslaViewModel : ViewModel() {
                             batteryLevel = obj.optInt("battery_level", 0),
                             odometer = obj.optInt("odometer", 0),
                             outsideTemp = obj.optDouble("outside_temp", 22.0).toFloat(),
-                            parkDurationStr = obj.optString("park_duration_str", "상태 수신 완료")
+                            parkDurationStr = obj.optString("park_duration_str", "상태 수신 완료"),
+                            tpmsFl = obj.optDouble("tpms_fl", 0.0).toFloat(),
+                            tpmsFr = obj.optDouble("tpms_fr", 0.0).toFloat(),
+                            tpmsRl = obj.optDouble("tpms_rl", 0.0).toFloat(),
+                            tpmsRr = obj.optDouble("tpms_rr", 0.0).toFloat()
                         )
                     }
                 } catch (e: Exception) {
@@ -172,19 +176,19 @@ class TeslaViewModel : ViewModel() {
                         parsedTrips.add(
                             TripItem(
                                 id = item.optString("id", "$i"),
-                                timeStr = formattedDate,
                                 date = formattedDate,
-                                startDong = startAddr,
                                 startAddress = startAddr,
-                                endDong = endAddr,
                                 endAddress = endAddr,
-                                moveKm = moveK,
                                 distanceKm = moveK,
-                                durationMin = durMin,
-                                driveTimeMin = durMin,
-                                useBattery = useBat,
                                 batteryUsed = useBat,
-                                locationListJson = locJson
+                                driveTimeMin = durMin,
+                                locationListJson = locJson,
+                                startDong = startAddr,
+                                endDong = endAddr,
+                                moveKm = moveK,
+                                durationMin = durMin,
+                                useBattery = useBat,
+                                timeStr = formattedDate
                             )
                         )
                     }
