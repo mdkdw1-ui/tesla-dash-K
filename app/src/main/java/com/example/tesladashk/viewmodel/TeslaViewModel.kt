@@ -110,13 +110,9 @@ class TeslaViewModel : ViewModel() {
 
             addLog("[동기화] Supabase DB 데이터 동기화 시도...")
 
-            val targetUrl = if (cfg.supabaseUrl.endsWith("/rest/v1")) {
-                "${cfg.supabaseUrl}/vehicle_state?select=*"
-            } else if (cfg.supabaseUrl.contains("/rest/v1")) {
-                cfg.supabaseUrl
-            } else {
-                "${cfg.supabaseUrl}/rest/v1/vehicle_state?select=*"
-            }
+            val baseUrl = cfg.supabaseUrl.split("/rest/v1")[0].removeSuffix("/")
+            // vehicle 테이블의 최신 updated_at 기준 1건 조회
+            val targetUrl = "$baseUrl/rest/v1/vehicle?select=*&order=updated_at.desc&limit=1"
 
             val response = ApiClient.executeSupabaseGet(targetUrl, cfg.supabaseKey)
 
@@ -125,25 +121,35 @@ class TeslaViewModel : ViewModel() {
                     val jsonArray = JSONArray(response.body)
                     if (jsonArray.length() > 0) {
                         val obj = jsonArray.getJSONObject(0)
-                        val status = obj.optString("status_text", "현재: 주차 중")
-                        val battery = obj.optInt("battery_level", 85)
-                        val odo = obj.optInt("odometer", 45210)
-                        val temp = obj.optDouble("outside_temp", 24.0).toFloat()
-                        val parkDuration = obj.optString("park_duration_str", "주차 중")
+                        
+                        // DB 컬럼 매핑
+                        val stateStr = obj.optString("state", "online")
+                        val formattedStatus = when (stateStr.lowercase()) {
+                            "online" -> "현재: 대기 중 (Online)"
+                            "driving" -> "현재: 주행 중 (Driving)"
+                            "charging" -> "현재: 충전 중 (Charging)"
+                            "offline" -> "현재: 오프라인 (Offline)"
+                            else -> "현재: $stateStr"
+                        }
+                        
+                        val battery = obj.optInt("battery_level", 0)
+                        val odo = obj.optInt("odometer", 0)
+                        val temp = obj.optDouble("outside_temp", 22.0).toFloat()
+                        val parkDuration = obj.optString("park_duration_str", "상태 수신 완료")
 
                         _vehicleState.value = VehicleState(
-                            statusText = status,
+                            statusText = formattedStatus,
                             batteryLevel = battery,
                             odometer = odo,
                             outsideTemp = temp,
                             parkDurationStr = parkDuration
                         )
-                        addLog("[동기화 성공] Supabase 최신 데이터 수신 완료")
+                        addLog("[동기화 성공] vehicle 테이블 최신 상태 수신 완료 ($stateStr, 배터리: $battery%)")
                     } else {
-                        addLog("[동기화] DB 테이블에 데이터가 비어 있습니다 (빈 배열).")
+                        addLog("[동기화] vehicle 테이블에 데이터가 없습니다.")
                     }
                 } catch (e: Exception) {
-                    addLog("[동기화 수신] Raw JSON 응답 받음 (파싱 규격 대기 중)")
+                    addLog("[동기화 수신] JSON 파싱 오류: ${e.localizedMessage}")
                 }
             } else {
                 addLog("[동기화 실패] Code ${response.statusCode}: ${response.errorMessage}")
