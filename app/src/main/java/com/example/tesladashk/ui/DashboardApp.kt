@@ -17,24 +17,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
-enum class VehicleStatusType {
-    DRIVING, PARKED, CHARGING, SLEEP, UNKNOWN
-}
+// 기존 viewmodel 패키지의 모델 클래스 import
+import com.example.tesladashk.viewmodel.TeslaViewModel
+import com.example.tesladashk.viewmodel.StatusHistoryItem
+import com.example.tesladashk.viewmodel.VehicleStatusType
 
-data class StatusHistoryItem(
-    val timestamp: String,
-    val type: VehicleStatusType,
-    val batteryLevel: Int,
-    val address: String,
-    val detailText: String = ""
-)
-
+// 주소 정제 함수 (서울특별시, 경기도, 고양시 제거)
 fun formatAddress(address: String?): String {
     if (address.isNullOrBlank()) return ""
     return address
@@ -46,50 +36,6 @@ fun formatAddress(address: String?): String {
         .replace("고양시", "")
         .trim()
 }
-
-class TeslaViewModel : ViewModel() {
-    private var lastBatteryLevel: Int? = null
-    val historyList = mutableStateListOf<StatusHistoryItem>()
-
-    fun updateVehicleState(
-        currentBattery: Int,
-        isDriving: Boolean,
-        rawAddress: String,
-        currentKm: Double
-    ) {
-        val cleanAddress = formatAddress(rawAddress)
-        val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-
-        val statusType = when {
-            lastBatteryLevel != null && (currentBattery - lastBatteryLevel!!) >= 1 -> {
-                VehicleStatusType.CHARGING
-            }
-            isDriving -> VehicleStatusType.DRIVING
-            else -> VehicleStatusType.PARKED
-        }
-
-        val batteryDiff = lastBatteryLevel?.let { currentBattery - it } ?: 0
-        val detail = if (statusType == VehicleStatusType.CHARGING && batteryDiff > 0) {
-            "+${batteryDiff}% 충전 중"
-        } else {
-            "${currentKm}km"
-        }
-
-        lastBatteryLevel = currentBattery
-
-        val newItem = StatusHistoryItem(
-            timestamp = currentTime,
-            type = statusType,
-            batteryLevel = currentBattery,
-            address = cleanAddress,
-            detailText = detail
-        )
-        
-        historyList.add(0, newItem)
-    }
-}
-
-typealias DashboardViewModel = TeslaViewModel
 
 @Composable
 fun DashboardApp(viewModel: TeslaViewModel = viewModel()) {
