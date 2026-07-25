@@ -46,11 +46,11 @@ class TeslaViewModel(application: Application) : AndroidViewModel(application) {
         val kakaoKey = prefs.getString("kakaoKey", "") ?: ""
         val supabaseUrl = prefs.getString("supabaseUrl", "") ?: ""
         val supabaseKey = prefs.getString("supabaseKey", "") ?: ""
-        val ghToken = prefs.getString("ghToken", "") ?: ""
+        val vercelUrl = prefs.getString("vercelUrl", "https://my-tesla-app.vercel.app") ?: ""
         val vehicleId = prefs.getString("vehicleId", "") ?: ""
         val ntfyTopic = prefs.getString("ntfyTopic", "") ?: ""
 
-        _config.value = ConfigState(kakaoKey, supabaseUrl, supabaseKey, ghToken, vehicleId, ntfyTopic)
+        _config.value = ConfigState(kakaoKey, supabaseUrl, supabaseKey, vercelUrl, vehicleId, ntfyTopic)
         if (supabaseUrl.isNotBlank() && supabaseKey.isNotBlank()) {
             refreshData()
         }
@@ -75,13 +75,19 @@ class TeslaViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshData() {
         viewModelScope.launch {
             _isRefreshing.value = true
-            addLog("[갱신 요청] Supabase 데이터 수신 시작...")
 
             val cfg = _config.value
-            if (cfg.ghToken.isNotBlank()) {
-                ApiClient.triggerGitHubSync(cfg.ghToken)
+            if (cfg.vercelUrl.isNotBlank()) {
+                addLog("[Vercel] api/sync 동기화 요청 중...")
+                val vRes = ApiClient.triggerVercelSync(cfg.vercelUrl)
+                if (vRes.isSuccess) {
+                    addLog("[Vercel] 동기화 성공!")
+                } else {
+                    addLog("[Vercel] 동기화 응답: HTTP ${vRes.code}")
+                }
             }
 
+            addLog("[Supabase] 최신 데이터 조회 중...")
             syncWithSupabaseInternal()
             _isRefreshing.value = false
         }
@@ -91,14 +97,14 @@ class TeslaViewModel(application: Application) : AndroidViewModel(application) {
         kakaoKey: String,
         supabaseUrl: String,
         supabaseKey: String,
-        ghToken: String,
+        vercelUrl: String,
         vehicleId: String,
         ntfyTopic: String
     ) {
         val cleanUrl = supabaseUrl.trim().removeSuffix("/")
         val cleanKey = supabaseKey.trim()
         val cleanKakao = kakaoKey.trim()
-        val cleanGh = ghToken.trim()
+        val cleanVercel = vercelUrl.trim().removeSuffix("/")
         val cleanVid = vehicleId.trim()
         val cleanNtfy = ntfyTopic.trim()
 
@@ -106,14 +112,14 @@ class TeslaViewModel(application: Application) : AndroidViewModel(application) {
             putString("kakaoKey", cleanKakao)
             putString("supabaseUrl", cleanUrl)
             putString("supabaseKey", cleanKey)
-            putString("ghToken", cleanGh)
+            putString("vercelUrl", cleanVercel)
             putString("vehicleId", cleanVid)
             putString("ntfyTopic", cleanNtfy)
             apply()
         }
 
-        _config.value = ConfigState(cleanKakao, cleanUrl, cleanKey, cleanGh, cleanVid, cleanNtfy)
-        addLog("[설정] 설정값이 기기에 영구 저장되었습니다.")
+        _config.value = ConfigState(cleanKakao, cleanUrl, cleanKey, cleanVercel, cleanVid, cleanNtfy)
+        addLog("[설정] Vercel 연동 정보 저장 완료")
         refreshData()
     }
 
@@ -152,7 +158,7 @@ class TeslaViewModel(application: Application) : AndroidViewModel(application) {
 
         val baseUrl = cfg.supabaseUrl.split("/rest/v1")[0].removeSuffix("/")
 
-        // 1. 차량 상태 정보 수신
+        // 1. 차량 상태 정보
         val vehicleUrl = "$baseUrl/rest/v1/vehicle?select=*&order=updated_at.desc&limit=1"
         val vehicleResp = ApiClient.executeSupabaseGet(vehicleUrl, cfg.supabaseKey)
         if (vehicleResp.isSuccess) {
@@ -175,13 +181,11 @@ class TeslaViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 addLog("[차량 상태 파싱 오류] ${e.localizedMessage}")
             }
-        } else {
-            addLog("[차량 상태 조회 실패] HTTP ${vehicleResp.code}")
         }
 
         val parsedList = mutableListOf<TripItem>()
 
-        // 2. 주행 기록 수신 (최대 1000건)
+        // 2. 주행 기록
         val drivingUrl = "$baseUrl/rest/v1/driving?select=*&order=created_at.desc&limit=1000"
         val drivingResp = ApiClient.executeSupabaseGet(drivingUrl, cfg.supabaseKey)
         var drivingCount = 0
@@ -223,11 +227,9 @@ class TeslaViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 addLog("[주행 파싱 오류] ${e.localizedMessage}")
             }
-        } else {
-            addLog("[주행기록 조회 실패] HTTP ${drivingResp.code}")
         }
 
-        // 3. 충전 기록 수신 (최대 500건) - charging 테이블 연동
+        // 3. 충전 기록
         val chargingUrl = "$baseUrl/rest/v1/charging?select=*&order=created_at.desc&limit=500"
         val chargingResp = ApiClient.executeSupabaseGet(chargingUrl, cfg.supabaseKey)
         var chargingCount = 0
@@ -242,18 +244,11 @@ class TeslaViewModel(application: Application) : AndroidViewModel(application) {
                         val kstDateStr = parseToKst(rawCreated)
 
                         val location = obj.optString("address", obj.optString("location", "충전 장소"))
-                        val addedKwh = obj.optDouble("charge_energy_added", obj.optDouble("kwh", 0.0))
-                        val startBat = obj.optInt("start_battery", obj.optInt("start_battery_level", 0))
-                        val endBat = obj.optInt("end_battery", obj.optInt("end_battery_level", 0))
-                        val batDiff = if (endBat > startBat) endBat - startBat else obj.optInt("battery_gained", 0)
+                        val addedKwh = obj.optDouble("kwh", obj.optDouble("charge_energy_added", 0.0))
                         val duration = obj.optInt("charge_time_min", obj.optInt("duration_min", 0))
 
                         val chargeTitle = "⚡ [충전] $location"
-                        val chargeDetail = if (addedKwh > 0) {
-                            "충전량: +${String.format(Locale.US, "%.1f", addedKwh)}kWh ($startBat% ➔ $endBat%)"
-                        } else {
-                            "배터리 $startBat% ➔ $endBat% (+${batDiff}%)"
-                        }
+                        val chargeDetail = "충전량: +${String.format(Locale.US, "%.1f", addedKwh)}kWh"
 
                         parsedList.add(
                             TripItem(
@@ -263,12 +258,12 @@ class TeslaViewModel(application: Application) : AndroidViewModel(application) {
                                 endDong = chargeDetail,
                                 moveKm = 0.0,
                                 durationMin = duration,
-                                useBattery = -batDiff.toDouble(),
+                                useBattery = -addedKwh,
                                 date = kstDateStr,
                                 startAddress = chargeTitle,
                                 endAddress = chargeDetail,
                                 distanceKm = 0.0,
-                                batteryUsed = -batDiff.toDouble(),
+                                batteryUsed = -addedKwh,
                                 driveTimeMin = duration
                             )
                         )
@@ -279,10 +274,9 @@ class TeslaViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // 4. 주행 + 충전 기록 통합 정렬 (최신순)
         val sortedList = parsedList.sortedByDescending { it.timeStr }
         _trips.value = sortedList
 
-        addLog("[동기화 완료] 주행 $drivingCount건, 충전 $chargingCount건 수신 완료 (총 ${sortedList.size}건)")
+        addLog("[동기화 완료] 주행 $drivingCount건, 충전 $chargingCount건 수신")
     }
 }
