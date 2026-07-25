@@ -16,6 +16,7 @@ class TeslaViewModel : ViewModel() {
 
     private val _config = MutableStateFlow(ConfigState())
     val config: StateFlow<ConfigState> = _config.asStateFlow()
+    val configState: StateFlow<ConfigState> = _config.asStateFlow()
 
     private val _vehicleState = MutableStateFlow(VehicleState())
     val vehicleState: StateFlow<VehicleState> = _vehicleState.asStateFlow()
@@ -25,6 +26,16 @@ class TeslaViewModel : ViewModel() {
 
     private val _logs = MutableStateFlow<List<String>>(emptyList())
     val logs: StateFlow<List<String>> = _logs.asStateFlow()
+    val logsState: StateFlow<List<String>> = _logs.asStateFlow()
+
+    private val _isGuardianActive = MutableStateFlow(false)
+    val isGuardianActive: StateFlow<Boolean> = _isGuardianActive.asStateFlow()
+
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _accessToken = MutableStateFlow(TeslaApi.DEFAULT_ACCESS_TOKEN)
+    val accessToken: StateFlow<String> = _accessToken.asStateFlow()
 
     init {
         addLog("[시스템] TeslaViewModel 준비 완료")
@@ -37,6 +48,15 @@ class TeslaViewModel : ViewModel() {
 
     fun clearLogs() {
         _logs.value = emptyList()
+    }
+
+    fun toggleGuardian(active: Boolean = !_isGuardianActive.value) {
+        _isGuardianActive.value = active
+        addLog("[가디언] 감시 모드 가디언 ${if (_isGuardianActive.value) "활성화" else "비활성화"}")
+    }
+
+    fun refreshData() {
+        syncWithSupabase()
     }
 
     fun saveConfig(
@@ -59,11 +79,30 @@ class TeslaViewModel : ViewModel() {
         syncWithSupabase()
     }
 
+    fun updateConfig(
+        kakaoKey: String = "",
+        supabaseUrl: String = "",
+        supabaseKey: String = "",
+        ghToken: String = "",
+        vehicleId: String = "",
+        ntfyTopic: String = ""
+    ) {
+        saveConfig(kakaoKey, supabaseUrl, supabaseKey, ghToken, vehicleId, ntfyTopic)
+    }
+
+    fun updateConfig(newConfig: ConfigState) {
+        _config.value = newConfig
+        addLog("[설정] API 및 DB 설정 정보가 저장되었습니다.")
+        syncWithSupabase()
+    }
+
     fun syncWithSupabase() {
         viewModelScope.launch {
+            _isRefreshing.value = true
             val cfg = _config.value
             if (cfg.supabaseUrl.isBlank() || cfg.supabaseKey.isBlank()) {
                 addLog("[동기화 실패] Supabase URL 또는 Key가 설정되지 않았습니다.")
+                _isRefreshing.value = false
                 return@launch
             }
 
@@ -107,6 +146,7 @@ class TeslaViewModel : ViewModel() {
             } else {
                 addLog("[동기화 실패] Code ${response.statusCode}: ${response.errorMessage}")
             }
+            _isRefreshing.value = false
         }
     }
 }
