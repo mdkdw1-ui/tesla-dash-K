@@ -8,10 +8,11 @@ import com.kakao.vectormap.KakaoMap
 import com.kakao.vectormap.KakaoMapReadyCallback
 import com.kakao.vectormap.LatLng
 import com.kakao.vectormap.MapLifeCycleCallback
-import com.kakao.vectormap.shape.RouteLineOptions
-import com.kakao.vectormap.shape.RouteLineSegment
-import com.kakao.vectormap.shape.RouteLineStyle
-import com.kakao.vectormap.shape.RouteLineStyles
+import com.kakao.vectormap.route.RouteLine
+import com.kakao.vectormap.route.RouteLineLayer
+import com.kakao.vectormap.route.RouteLineOptions
+import com.kakao.vectormap.route.RouteLineSegment
+import com.kakao.vectormap.route.RouteLineStyle
 import com.mdkdw1.ui.tesla.databinding.ActivityKakaoRouteMapBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -22,7 +23,6 @@ class KakaoRouteMapActivity : AppCompatActivity() {
     private lateinit var binding: ActivityKakaoRouteMapBinding
     private lateinit var repository: RouteHistoryRepository
     private var kakaoMap: KakaoMap? = null
-    private var currentPeriod: RoutePeriod = RoutePeriod.DAY
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,7 +30,6 @@ class KakaoRouteMapActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         repository = RouteHistoryRepository(SupabaseProvider.client)
-        currentPeriod = intent.getStringExtra(EXTRA_PERIOD)?.toRoutePeriod() ?: RoutePeriod.DAY
 
         binding.mapView.start(
             object : MapLifeCycleCallback() {
@@ -42,7 +41,7 @@ class KakaoRouteMapActivity : AppCompatActivity() {
             object : KakaoMapReadyCallback() {
                 override fun onMapReady(map: KakaoMap) {
                     kakaoMap = map
-                    loadAndDrawRoutes(currentPeriod)
+                    loadAndDrawRoutes(RoutePeriod.DAY)
                 }
             }
         )
@@ -69,11 +68,11 @@ class KakaoRouteMapActivity : AppCompatActivity() {
             val routes = withContext(Dispatchers.IO) {
                 repository.fetchRoutes(range)
             }
-            drawRoutes(routes, period)
+            drawRoutes(routes)
         }
     }
 
-    private fun drawRoutes(routes: List<DrivingRow>, period: RoutePeriod) {
+    private fun drawRoutes(routes: List<DrivingRow>) {
         val map = kakaoMap ?: return
         val points = routes.flatMap { it.location_list }
             .filter { it.latitude != 0.0 && it.longitude != 0.0 }
@@ -84,45 +83,16 @@ class KakaoRouteMapActivity : AppCompatActivity() {
         }
 
         val latLngs = points.map { LatLng.from(it.latitude, it.longitude) }
-        val styles = RouteLineStyles.from(
-            RouteLineStyle.from(6f, 0xFFEAEAEA.toInt())
-        )
-        val segment = RouteLineSegment.from(latLngs).setStyles(styles)
+        val segment = RouteLineSegment.from(latLngs)
         val options = RouteLineOptions.from(segment)
+        val layer: RouteLineLayer? = map.routeLineManager?.layer
+        val routeLine: RouteLine? = layer?.addRouteLine(options)
 
-        map.routeLineManager?.layer?.addRouteLine(options)?.show()
-        toast("${label(period)} 경로 ${routes.size}건")
-    }
-
-    private fun label(period: RoutePeriod): String {
-        return when (period) {
-            RoutePeriod.DAY -> "일"
-            RoutePeriod.WEEK -> "주"
-            RoutePeriod.MONTH -> "월"
-            RoutePeriod.QUARTER -> "분기"
-            RoutePeriod.HALF_YEAR -> "반기"
-            RoutePeriod.YEAR -> "년"
-            RoutePeriod.CUSTOM -> "직접"
-        }
-    }
-
-    private fun String.toRoutePeriod(): RoutePeriod {
-        return when (uppercase()) {
-            "DAY" -> RoutePeriod.DAY
-            "WEEK" -> RoutePeriod.WEEK
-            "MONTH" -> RoutePeriod.MONTH
-            "QUARTER" -> RoutePeriod.QUARTER
-            "HALF_YEAR" -> RoutePeriod.HALF_YEAR
-            "YEAR" -> RoutePeriod.YEAR
-            else -> RoutePeriod.DAY
-        }
+        routeLine?.show()
+        toast("경로 ${routes.size}건")
     }
 
     private fun toast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
-
-    companion object {
-        const val EXTRA_PERIOD = "extra_period"
     }
 }

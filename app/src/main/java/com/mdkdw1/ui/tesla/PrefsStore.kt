@@ -15,6 +15,18 @@ class PrefsStore(context: Context) {
         )
     }
 
+    fun saveAccessToken(value: String?) = prefs.edit().putString(KEY_ACCESS_TOKEN, value.orEmpty()).apply()
+    fun getAccessToken(): String = prefs.getString(KEY_ACCESS_TOKEN, "").orEmpty()
+
+    fun clearAuth() {
+        prefs.edit()
+            .remove(KEY_ACCESS_TOKEN)
+            .remove(KEY_VEHICLE_ID)
+            .remove(KEY_VIN)
+            .remove(KEY_DISPLAY_NAME)
+            .apply()
+    }
+
     fun saveClientId(value: String?) = prefs.edit().putString(KEY_CLIENT_ID, value.orEmpty()).apply()
     fun getClientId(): String = prefs.getString(KEY_CLIENT_ID, "").orEmpty()
     fun saveBackendUrl(value: String?) = prefs.edit().putString(KEY_BACKEND_URL, value.orEmpty()).apply()
@@ -32,6 +44,7 @@ class PrefsStore(context: Context) {
 
     companion object {
         private const val PREF_FILE = "tesla_dashboard_secure_prefs"
+        private const val KEY_ACCESS_TOKEN = "access_token"
         private const val KEY_CLIENT_ID = "client_id"
         private const val KEY_BACKEND_URL = "backend_url"
         private const val KEY_KAKAO_NATIVE_APP_KEY = "kakao_native_app_key"

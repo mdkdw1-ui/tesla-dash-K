@@ -1,11 +1,9 @@
 package com.mdkdw1.ui.tesla
 
 import io.github.jan.supabase.SupabaseClient
-import io.github.jan.supabase.createSupabaseClient
-import io.github.jan.supabase.postgrest.Postgrest
-import io.github.jan.supabase.postgrest.query.Order
+import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
-import io.github.jan.supabase.from
+import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.time.ZoneId
