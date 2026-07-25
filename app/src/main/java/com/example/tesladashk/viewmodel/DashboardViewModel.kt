@@ -1,105 +1,91 @@
 package com.example.tesladashk.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
-import com.example.tesladashk.network.AppConfig
-import com.example.tesladashk.network.DrivingTrip
-import com.example.tesladashk.network.VehicleRow
+import androidx.lifecycle.viewModelScope
+import com.example.tesladashk.network.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToInt
-
-object ApiClient {
-    // Retrofit ApiClient 헬퍼 참조용
-}
 
 class DashboardViewModel : ViewModel() {
 
     private val _config = MutableStateFlow(AppConfig())
     val config: StateFlow<AppConfig> = _config
 
-    private val _trips = MutableStateFlow<List<DrivingTrip>>(emptyList())
-    val trips: StateFlow<List<DrivingTrip>> = _trips
-    val allTrips: StateFlow<List<DrivingTrip>> = _trips
-
     private val _vehicleRows = MutableStateFlow<List<VehicleRow>>(emptyList())
     val vehicleRows: StateFlow<List<VehicleRow>> = _vehicleRows
 
-    fun saveConfig(newConfig: AppConfig) {
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading
+
+    fun loadInitialConfig(context: Context) {
+        val loaded = ConfigManager.loadConfig(context)
+        _config.value = loaded
+        fetchSupabaseData()
+    }
+
+    fun saveConfig(context: Context, newConfig: AppConfig) {
         _config.value = newConfig
+        ConfigManager.saveConfig(context, newConfig)
+        fetchSupabaseData()
     }
 
-    fun toPsi(v: Double): Int {
-        return if (v > 0 && v < 10) (v * 14.5038).roundToInt() else v.roundToInt()
-    }
-
-    fun parseDrivingTime(rawVal: Any?): Int {
-        if (rawVal is Number) return rawVal.toInt().coerceAtLeast(1)
-        if (rawVal is String && rawVal.isNotBlank() && rawVal.uppercase() != "NULL") {
-            val str = rawVal.trim()
-            var hours = 0
-            var mins = 0
-            val hMatch = Regex("(\\d+)\\s*시간").find(str)
-            if (hMatch != null) hours = hMatch.groupValues[1].toInt()
-            val mMatch = Regex("(\\d+)\\s*분").find(str)
-            if (mMatch != null) mins = mMatch.groupValues[1].toInt()
-            if (hMatch != null || mMatch != null) return hours * 60 + mins
-            val numOnly = str.toDoubleOrNull()
-            if (numOnly != null) return numOnly.toInt().coerceAtLeast(1)
-        }
-        return 1
-    }
-
-    fun calculateMonthlyChargingStats(selYear: Int, selMonth: Int): Pair<Int, Double> {
-        val monthLogs = _vehicleRows.value.filter {
-            val cal = Calendar.getInstance().apply { time = parseIsoDate(it.updatedAt) }
-            cal.get(Calendar.YEAR) == selYear && (cal.get(Calendar.MONTH) + 1) == selMonth
-        }.sortedBy { parseIsoDate(it.updatedAt) }
-
-        var chargeCount = 0
-        var totalChargedPct = 0.0
-        var inChargingSession = false
-
-        for (i in 1 until monthLogs.size) {
-            val prev = monthLogs[i - 1]
-            val cur = monthLogs[i]
-            val pBat = prev.batteryLevel ?: 0
-            val cBat = cur.batteryLevel ?: 0
-
-            if (cBat > pBat) {
-                if (!inChargingSession) {
-                    inChargingSession = true
-                    chargeCount++
+    fun triggerVercelSync() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isLoading.value = true
+            try {
+                val retrofit = Retrofit.Builder()
+                    .baseUrl("https://my-tesla-app-git-main-glenn-team.vercel.app/")
+                    .addConverterFactory(GsonConverterFactory.create())
+                    .build()
+                val api = retrofit.create(VercelSyncApi::class.java)
+                val resp = api.triggerSync()
+                if (resp.isSuccessful) {
+                    fetchSupabaseData()
                 }
-                totalChargedPct += (cBat - pBat)
-            } else if (cBat < pBat) {
-                inChargingSession = false
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _isLoading.value = false
             }
         }
-        val totalChargedKwh = (totalChargedPct / 100.0) * 60.0
-        return Pair(chargeCount, totalChargedKwh)
     }
 
-    fun buildSequentialRouteHtml(tripsList: List<DrivingTrip>): String {
-        if (tripsList.isEmpty()) return ""
-        val sorted = tripsList.sortedBy { it.timestamp }
-        val points = mutableListOf<String>()
-        sorted.forEachIndexed { idx, trip ->
-            if (idx == 0) points.add(trip.startDong)
-            points.add(trip.endDong)
+    fun fetchSupabaseData() {
+        val cfg = _config.value
+        if (cfg.supabaseUrl.isBlank() || cfg.supabaseKey.isBlank()) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val baseUrl = if (cfg.supabaseUrl.endsWith("/")) cfg.supabaseUrl else "${cfg.supabaseUrl}/"
+                val retrofit = Retrofit.Builder()
+                    .baseUrl(baseUrl)
+                    .addConverterFactory(GsonConverterFactory.create())
+                    .build()
+                val api = retrofit.create(SupabaseApi::class.java)
+                val resp = api.getVehicleStates(
+                    apiKey = cfg.supabaseKey,
+                    bearerToken = "Bearer ${cfg.supabaseKey}"
+                )
+                if (resp.isSuccessful && resp.body() != null) {
+                    _vehicleRows.value = resp.body()!!
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
-        val uniquePoints = mutableListOf<String>()
-        points.forEachIndexed { i, pt ->
-            if (i == 0 || pt != points[i - 1]) uniquePoints.add(pt)
-        }
-        return uniquePoints.joinToString(" → ")
     }
 
-    private fun parseIsoDate(dateStr: String?): Date {
-        if (dateStr == null) return Date()
-        return try {
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).parse(dateStr) ?: Date()
-        } catch (e: Exception) { Date() }
+    fun toPsi(v: Double?): String {
+        if (v == null || v <= 0) return "0.0"
+        val psi = if (v < 10) v * 14.5038 else v
+        return String.format(Locale.getDefault(), "%.1f", psi)
     }
 }
