@@ -11,6 +11,20 @@ class TeslaApiClient(
         callback(true, null)
     }
 
+    fun getVehicles(callback: (List<TeslaVehicle>?, String?) -> Unit) {
+        callback(emptyList(), null)
+    }
+
+    fun saveVehicleMeta(vehicle: TeslaVehicle) {
+        prefsStore.saveVehicleId(vehicle.vehicleId ?: vehicle.id)
+        prefsStore.saveVin(vehicle.vin)
+        prefsStore.saveDisplayName(vehicle.displayName)
+    }
+
+    fun getVehicleData(vehicleId: Long, callback: (TeslaVehicleData?, String?) -> Unit) {
+        callback(null, "not implemented")
+    }
+
     fun flashLights(vehicleId: Long, callback: (Boolean, String?) -> Unit) {
         callback(true, null)
     }
