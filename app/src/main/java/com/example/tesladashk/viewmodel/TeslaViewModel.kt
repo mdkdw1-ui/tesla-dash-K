@@ -25,6 +25,9 @@ class TeslaViewModel : ViewModel() {
     val trips: StateFlow<List<TripItem>> = _trips.asStateFlow()
     val tripsState: StateFlow<List<TripItem>> = _trips.asStateFlow()
 
+    private val _selectedTrip = MutableStateFlow<TripItem?>(null)
+    val selectedTrip: StateFlow<TripItem?> = _selectedTrip.asStateFlow()
+
     private val _logs = MutableStateFlow<List<String>>(emptyList())
     val logs: StateFlow<List<String>> = _logs.asStateFlow()
     val logsState: StateFlow<List<String>> = _logs.asStateFlow()
@@ -55,6 +58,10 @@ class TeslaViewModel : ViewModel() {
     fun toggleGuardian(active: Boolean = !_isGuardianActive.value) {
         _isGuardianActive.value = active
         addLog("[가디언] 감시 모드 가디언 ${if (_isGuardianActive.value) "활성화" else "비활성화"}")
+    }
+
+    fun selectTrip(trip: TripItem) {
+        _selectedTrip.value = trip
     }
 
     fun refreshData() {
@@ -108,21 +115,18 @@ class TeslaViewModel : ViewModel() {
                 return@launch
             }
 
-            addLog("[동기화] Supabase DB 데이터 동기화 시도...")
-
             val baseUrl = cfg.supabaseUrl.split("/rest/v1")[0].removeSuffix("/")
-            // vehicle 테이블의 최신 updated_at 기준 1건 조회
-            val targetUrl = "$baseUrl/rest/v1/vehicle?select=*&order=updated_at.desc&limit=1"
+            addLog("[동기화] Supabase vehicle 및 driving 데이터 수신 중...")
 
-            val response = ApiClient.executeSupabaseGet(targetUrl, cfg.supabaseKey)
+            // 1. vehicle 테이블 (차량 상태)
+            val vehicleUrl = "$baseUrl/rest/v1/vehicle?select=*&order=updated_at.desc&limit=1"
+            val vehicleResp = ApiClient.executeSupabaseGet(vehicleUrl, cfg.supabaseKey)
 
-            if (response.isSuccess) {
+            if (vehicleResp.isSuccess) {
                 try {
-                    val jsonArray = JSONArray(response.body)
-                    if (jsonArray.length() > 0) {
-                        val obj = jsonArray.getJSONObject(0)
-                        
-                        // DB 컬럼 매핑
+                    val arr = JSONArray(vehicleResp.body)
+                    if (arr.length() > 0) {
+                        val obj = arr.getJSONObject(0)
                         val stateStr = obj.optString("state", "online")
                         val formattedStatus = when (stateStr.lowercase()) {
                             "online" -> "현재: 대기 중 (Online)"
@@ -131,29 +135,61 @@ class TeslaViewModel : ViewModel() {
                             "offline" -> "현재: 오프라인 (Offline)"
                             else -> "현재: $stateStr"
                         }
-                        
-                        val battery = obj.optInt("battery_level", 0)
-                        val odo = obj.optInt("odometer", 0)
-                        val temp = obj.optDouble("outside_temp", 22.0).toFloat()
-                        val parkDuration = obj.optString("park_duration_str", "상태 수신 완료")
-
                         _vehicleState.value = VehicleState(
                             statusText = formattedStatus,
-                            batteryLevel = battery,
-                            odometer = odo,
-                            outsideTemp = temp,
-                            parkDurationStr = parkDuration
+                            batteryLevel = obj.optInt("battery_level", 0),
+                            odometer = obj.optInt("odometer", 0),
+                            outsideTemp = obj.optDouble("outside_temp", 22.0).toFloat(),
+                            parkDurationStr = obj.optString("park_duration_str", "상태 수신 완료")
                         )
-                        addLog("[동기화 성공] vehicle 테이블 최신 상태 수신 완료 ($stateStr, 배터리: $battery%)")
-                    } else {
-                        addLog("[동기화] vehicle 테이블에 데이터가 없습니다.")
                     }
                 } catch (e: Exception) {
-                    addLog("[동기화 수신] JSON 파싱 오류: ${e.localizedMessage}")
+                    addLog("[차량상태 파싱 오류] ${e.localizedMessage}")
+                }
+            }
+
+            // 2. driving 테이블 (주행 기록 최신 30건)
+            val drivingUrl = "$baseUrl/rest/v1/driving?select=*&order=created_at.desc&limit=30"
+            val drivingResp = ApiClient.executeSupabaseGet(drivingUrl, cfg.supabaseKey)
+
+            if (drivingResp.isSuccess) {
+                try {
+                    val arr = JSONArray(drivingResp.body)
+                    val parsedTrips = mutableListOf<TripItem>()
+
+                    for (i in 0 until arr.length()) {
+                        val item = arr.getJSONObject(i)
+                        
+                        // 날짜 포맷 변환 (2025-12-18T10:44:44 -> 2025.12.18 10:44)
+                        val rawCreated = item.optString("created_at", "")
+                        val formattedDate = rawCreated.replace("T", " ").take(16).ifEmpty { "날짜 미상" }
+
+                        parsedTrips.add(
+                            TripItem(
+                                id = item.optString("id", "$i"),
+                                date = formattedDate,
+                                startAddress = item.optString("start_address", "출발지 미기재"),
+                                endAddress = item.optString("end_address", "도착지 미기재"),
+                                distanceKm = item.optDouble("move_km", 0.0),
+                                batteryUsed = item.optDouble("use_battery", 0.0),
+                                driveTimeMin = item.optInt("driving_time", 0),
+                                locationListJson = item.optString("location_list", "[]")
+                            )
+                        )
+                    }
+
+                    _trips.value = parsedTrips
+                    if (parsedTrips.isNotEmpty() && _selectedTrip.value == null) {
+                        _selectedTrip.value = parsedTrips[0]
+                    }
+                    addLog("[주행기록 동기화 성공] 최신 ${parsedTrips.size}건 수신 완료")
+                } catch (e: Exception) {
+                    addLog("[주행기록 파싱 오류] ${e.localizedMessage}")
                 }
             } else {
-                addLog("[동기화 실패] Code ${response.statusCode}: ${response.errorMessage}")
+                addLog("[주행기록 수신 실패] Code ${drivingResp.statusCode}")
             }
+
             _isRefreshing.value = false
         }
     }
