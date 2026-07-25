@@ -18,9 +18,9 @@ android {
         versionCode 1
         versionName "1.0"
 
-        buildConfigField "String", "SUPABASE_URL", ""${supabaseUrl}""
-        buildConfigField "String", "SUPABASE_ANON_KEY", ""${supabaseAnonKey}""
-        buildConfigField "String", "KAKAO_NATIVE_APP_KEY", ""${kakaoNativeAppKey}""
+        buildConfigField "String", "SUPABASE_URL", '"' + supabaseUrl + '"'
+        buildConfigField "String", "SUPABASE_ANON_KEY", '"' + supabaseAnonKey + '"'
+        buildConfigField "String", "KAKAO_NATIVE_APP_KEY", '"' + kakaoNativeAppKey + '"'
     }
 
     buildFeatures {
