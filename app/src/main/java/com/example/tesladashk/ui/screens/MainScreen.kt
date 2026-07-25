@@ -11,13 +11,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.tesladashk.viewmodel.DashboardViewModel
+import com.example.tesladashk.viewmodel.TeslaViewModel
 
 @Composable
 fun MainScreen(
     viewModel: DashboardViewModel,
     onOpenSettings: () -> Unit
 ) {
+    val teslaViewModel: TeslaViewModel = viewModel()
     var mainTab by remember { mutableIntStateOf(0) }
 
     Column(
@@ -104,7 +107,7 @@ fun MainScreen(
             if (mainTab == 0) {
                 TeslaMonitorScreen(viewModel = viewModel)
             } else {
-                GuardianScreen(viewModel = viewModel)
+                GuardianScreen(viewModel = teslaViewModel)
             }
         }
     }
