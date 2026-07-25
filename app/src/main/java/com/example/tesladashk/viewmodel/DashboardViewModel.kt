@@ -12,7 +12,6 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.math.roundToInt
 
 class DashboardViewModel : ViewModel() {
 
@@ -24,10 +23,12 @@ class DashboardViewModel : ViewModel() {
 
     private val _trips = MutableStateFlow<List<DrivingTrip>>(emptyList())
     val trips: StateFlow<List<DrivingTrip>> = _trips
-    val allTrips: StateFlow<List<DrivingTrip>> = _trips
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
+
+    private val _lastSyncTime = MutableStateFlow("")
+    val lastSyncTime: StateFlow<String> = _lastSyncTime
 
     fun loadInitialConfig(context: Context) {
         val loaded = ConfigManager.loadConfig(context)
@@ -41,7 +42,7 @@ class DashboardViewModel : ViewModel() {
         fetchSupabaseData()
     }
 
-    fun triggerVercelSync() {
+    fun triggerSyncAndFetch() {
         viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
             try {
@@ -50,13 +51,11 @@ class DashboardViewModel : ViewModel() {
                     .addConverterFactory(GsonConverterFactory.create())
                     .build()
                 val api = retrofit.create(VercelSyncApi::class.java)
-                val resp = api.triggerSync()
-                if (resp.isSuccessful) {
-                    fetchSupabaseData()
-                }
+                api.triggerSync()
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
+                fetchSupabaseData()
                 _isLoading.value = false
             }
         }
@@ -79,12 +78,58 @@ class DashboardViewModel : ViewModel() {
                     bearerToken = "Bearer ${cfg.supabaseKey}"
                 )
                 if (resp.isSuccessful && resp.body() != null) {
-                    _vehicleRows.value = resp.body()!!
+                    val data = resp.body()!!
+                    _vehicleRows.value = data
+                    _lastSyncTime.value = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+                    processTimelineTrips(data)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
+    }
+
+    private fun processTimelineTrips(rows: List<VehicleRow>) {
+        if (rows.isEmpty()) return
+        val list = mutableListOf<DrivingTrip>()
+        val sdfInput = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+        val sdfTime = SimpleDateFormat("HH:mm", Locale.getDefault())
+        val sdfDate = SimpleDateFormat("M월 d일", Locale.getDefault())
+
+        for (i in rows.indices) {
+            val curr = rows[i]
+            val prev = if (i < rows.size - 1) rows[i + 1] else curr
+
+            val dateObj = try { sdfInput.parse(curr.updatedAt ?: "") ?: Date() } catch (e: Exception) { Date() }
+            val timeStr = sdfTime.format(dateObj)
+            val dateStr = sdfDate.format(dateObj)
+
+            val stateType = when {
+                curr.state == "driving" || (prev.odometer != null && curr.odometer != null && curr.odometer > prev.odometer) -> "주행"
+                curr.sentryMode == true -> "감시"
+                else -> "온라인"
+            }
+
+            val batDiff = (prev.batteryLevel ?: 0) - (curr.batteryLevel ?: 0)
+            val distDiff = (curr.odometer ?: 0.0) - (prev.odometer ?: 0.0)
+
+            list.add(
+                DrivingTrip(
+                    id = curr.id ?: UUID.randomUUID().toString(),
+                    stateType = stateType,
+                    startTime = timeStr,
+                    endTime = timeStr,
+                    durationText = "56분",
+                    moveKM = if (distDiff > 0) String.format(Locale.getDefault(), "%.1f", distDiff).toDouble() else 0.0,
+                    batteryUsedPercent = if (batDiff > 0) batDiff.toDouble() else 0.0,
+                    startBattery = curr.batteryLevel ?: 0,
+                    endBattery = curr.batteryLevel ?: 0,
+                    endOdometer = curr.odometer ?: 0.0,
+                    dateGroup = dateStr
+                )
+            )
+        }
+        _trips.value = list
     }
 
     fun toPsi(v: Double?): String {
