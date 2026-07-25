@@ -1,5 +1,7 @@
 package com.example.tesladashk.network
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
@@ -40,36 +42,60 @@ data class ConfigState(
     val ntfyTopic: String = ""
 )
 
-object ApiClient {
-    fun executeSupabaseGet(urlString: String, apiKey: String): String {
-        val url = URL(urlString)
-        val conn = url.openConnection() as HttpURLConnection
-        conn.requestMethod = "GET"
-        conn.setRequestProperty("apikey", apiKey)
-        conn.setRequestProperty("Authorization", "Bearer $apiKey")
-        conn.setRequestProperty("Accept", "application/json")
-        conn.connectTimeout = 5000
-        conn.readTimeout = 5000
+data class ApiResponse(
+    val isSuccess: Boolean,
+    val statusCode: Int,
+    val body: String,
+    val errorMessage: String = ""
+)
 
-        return if (conn.responseCode in 200..299) {
-            BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
-        } else {
-            ""
+object ApiClient {
+    suspend fun executeSupabaseGet(urlString: String, apiKey: String): ApiResponse = withContext(Dispatchers.IO) {
+        if (urlString.isBlank() || apiKey.isBlank()) {
+            return@withContext ApiResponse(false, 400, "", "Supabase URL 또는 Key가 설정되지 않았습니다.")
+        }
+        try {
+            val url = URL(urlString)
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.setRequestProperty("apikey", apiKey)
+            conn.setRequestProperty("Authorization", "Bearer $apiKey")
+            conn.setRequestProperty("Accept", "application/json")
+            conn.connectTimeout = 5000
+            conn.readTimeout = 5000
+
+            val code = conn.responseCode
+            val isSuccess = code in 200..299
+            val stream = if (isSuccess) conn.inputStream else conn.errorStream
+            val body = stream?.bufferedReader()?.use { it.readText() } ?: ""
+
+            if (isSuccess) {
+                ApiResponse(true, code, body)
+            } else {
+                ApiResponse(false, code, body, "HTTP 오류 코드: $code")
+            }
+        } catch (e: Exception) {
+            ApiResponse(false, 500, "", e.localizedMessage ?: "네트워크 연결 예외 발생")
         }
     }
 
-    fun executeSupabasePost(urlString: String, apiKey: String, jsonBody: String) {
-        val url = URL(urlString)
-        val conn = url.openConnection() as HttpURLConnection
-        conn.requestMethod = "POST"
-        conn.setRequestProperty("apikey", apiKey)
-        conn.setRequestProperty("Authorization", "Bearer $apiKey")
-        conn.setRequestProperty("Content-Type", "application/json")
-        conn.setRequestProperty("Prefer", "return=minimal")
-        conn.doOutput = true
-        conn.connectTimeout = 5000
+    suspend fun executeSupabasePost(urlString: String, apiKey: String, jsonBody: String): Boolean = withContext(Dispatchers.IO) {
+        if (urlString.isBlank() || apiKey.isBlank()) return@withContext false
+        try {
+            val url = URL(urlString)
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("apikey", apiKey)
+            conn.setRequestProperty("Authorization", "Bearer $apiKey")
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.setRequestProperty("Prefer", "return=minimal")
+            conn.doOutput = true
+            conn.connectTimeout = 5000
 
-        OutputStreamWriter(conn.outputStream).use { it.write(jsonBody) }
-        conn.responseCode
+            OutputStreamWriter(conn.outputStream).use { it.write(jsonBody) }
+            conn.responseCode in 200..299
+        } catch (_: Exception) {
+            false
+        }
     }
 }
