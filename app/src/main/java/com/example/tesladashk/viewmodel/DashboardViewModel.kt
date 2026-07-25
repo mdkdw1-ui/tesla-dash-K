@@ -1,113 +1,105 @@
 package com.example.tesladashk.viewmodel
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.example.tesladashk.network.*
+import com.example.tesladashk.network.AppConfig
+import com.example.tesladashk.network.DrivingTrip
+import com.example.tesladashk.network.VehicleRow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.*
+import kotlin.math.roundToInt
+
+object ApiClient {
+    // Retrofit ApiClient 헬퍼 참조용
+}
 
 class DashboardViewModel : ViewModel() {
 
-    private val _config = MutableStateFlow(ConfigState())
-    val config: StateFlow<ConfigState> = _config.asStateFlow()
+    private val _config = MutableStateFlow(AppConfig())
+    val config: StateFlow<AppConfig> = _config
 
-    private val _vehicleState = MutableStateFlow(VehicleState())
-    val vehicleState: StateFlow<VehicleState> = _vehicleState.asStateFlow()
+    private val _trips = MutableStateFlow<List<DrivingTrip>>(emptyList())
+    val trips: StateFlow<List<DrivingTrip>> = _trips
+    val allTrips: StateFlow<List<DrivingTrip>> = _trips
 
-    private val _trips = MutableStateFlow<List<TripItem>>(emptyList())
-    val trips: StateFlow<List<TripItem>> = _trips.asStateFlow()
+    private val _vehicleRows = MutableStateFlow<List<VehicleRow>>(emptyList())
+    val vehicleRows: StateFlow<List<VehicleRow>> = _vehicleRows
 
-    private val _logs = MutableStateFlow<List<String>>(emptyList())
-    val logs: StateFlow<List<String>> = _logs.asStateFlow()
-
-    init {
-        addLog("[시스템] 앱이 성공적으로 시작되었습니다.")
+    fun saveConfig(newConfig: AppConfig) {
+        _config.value = newConfig
     }
 
-    fun addLog(msg: String) {
-        val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-        _logs.value = (listOf("[$time] $msg") + _logs.value).take(100)
+    fun toPsi(v: Double): Int {
+        return if (v > 0 && v < 10) (v * 14.5038).roundToInt() else v.roundToInt()
     }
 
-    fun clearLogs() {
-        _logs.value = emptyList()
+    fun parseDrivingTime(rawVal: Any?): Int {
+        if (rawVal is Number) return rawVal.toInt().coerceAtLeast(1)
+        if (rawVal is String && rawVal.isNotBlank() && rawVal.uppercase() != "NULL") {
+            val str = rawVal.trim()
+            var hours = 0
+            var mins = 0
+            val hMatch = Regex("(\\d+)\\s*시간").find(str)
+            if (hMatch != null) hours = hMatch.groupValues[1].toInt()
+            val mMatch = Regex("(\\d+)\\s*분").find(str)
+            if (mMatch != null) mins = mMatch.groupValues[1].toInt()
+            if (hMatch != null || mMatch != null) return hours * 60 + mins
+            val numOnly = str.toDoubleOrNull()
+            if (numOnly != null) return numOnly.toInt().coerceAtLeast(1)
+        }
+        return 1
     }
 
-    fun saveConfig(
-        kakaoKey: String,
-        supabaseUrl: String,
-        supabaseKey: String,
-        ghToken: String,
-        vehicleId: String,
-        ntfyTopic: String
-    ) {
-        _config.value = ConfigState(
-            kakaoKey = kakaoKey.trim(),
-            supabaseUrl = supabaseUrl.trim().removeSuffix("/"),
-            supabaseKey = supabaseKey.trim(),
-            ghToken = ghToken.trim(),
-            vehicleId = vehicleId.trim(),
-            ntfyTopic = ntfyTopic.trim()
-        )
-        addLog("[설정] API 및 DB 설정 정보가 저장되었습니다.")
-        syncWithSupabase()
-    }
+    fun calculateMonthlyChargingStats(selYear: Int, selMonth: Int): Pair<Int, Double> {
+        val monthLogs = _vehicleRows.value.filter {
+            val cal = Calendar.getInstance().apply { time = parseIsoDate(it.updatedAt) }
+            cal.get(Calendar.YEAR) == selYear && (cal.get(Calendar.MONTH) + 1) == selMonth
+        }.sortedBy { parseIsoDate(it.updatedAt) }
 
-    fun syncWithSupabase() {
-        viewModelScope.launch {
-            val cfg = _config.value
-            if (cfg.supabaseUrl.isBlank() || cfg.supabaseKey.isBlank()) {
-                addLog("[동기화 실패] Supabase URL 또는 Key가 설정되지 않았습니다.")
-                return@launch
-            }
+        var chargeCount = 0
+        var totalChargedPct = 0.0
+        var inChargingSession = false
 
-            addLog("[동기화] Supabase DB 데이터 동기화 시도...")
-            
-            val targetUrl = if (cfg.supabaseUrl.endsWith("/rest/v1")) {
-                "${cfg.supabaseUrl}/vehicle_state?select=*"
-            } else if (cfg.supabaseUrl.contains("/rest/v1")) {
-                cfg.supabaseUrl
-            } else {
-                "${cfg.supabaseUrl}/rest/v1/vehicle_state?select=*"
-            }
+        for (i in 1 until monthLogs.size) {
+            val prev = monthLogs[i - 1]
+            val cur = monthLogs[i]
+            val pBat = prev.batteryLevel ?: 0
+            val cBat = cur.batteryLevel ?: 0
 
-            val response = ApiClient.executeSupabaseGet(targetUrl, cfg.supabaseKey)
-
-            if (response.isSuccess) {
-                try {
-                    val jsonArray = JSONArray(response.body)
-                    if (jsonArray.length() > 0) {
-                        val obj = jsonArray.getJSONObject(0)
-                        val status = obj.optString("status_text", "현재: 주차 중")
-                        val battery = obj.optInt("battery_level", 85)
-                        val odo = obj.optInt("odometer", 45210)
-                        val temp = obj.optDouble("outside_temp", 24.0).toFloat()
-                        val parkDuration = obj.optString("park_duration_str", "주차 중")
-
-                        _vehicleState.value = VehicleState(
-                            statusText = status,
-                            batteryLevel = battery,
-                            odometer = odo,
-                            outsideTemp = temp,
-                            parkDurationStr = parkDuration
-                        )
-                        addLog("[동기화 성공] Supabase 최신 데이터 수신 완료")
-                    } else {
-                        addLog("[동기화] DB 테이블에 데이터가 비어 있습니다 (빈 배열).")
-                    }
-                } catch (e: Exception) {
-                    addLog("[동기화 수신] Raw JSON 응답 받음 (파싱 규격 대기 중)")
+            if (cBat > pBat) {
+                if (!inChargingSession) {
+                    inChargingSession = true
+                    chargeCount++
                 }
-            } else {
-                addLog("[동기화 실패] Code ${response.statusCode}: ${response.errorMessage}")
+                totalChargedPct += (cBat - pBat)
+            } else if (cBat < pBat) {
+                inChargingSession = false
             }
         }
+        val totalChargedKwh = (totalChargedPct / 100.0) * 60.0
+        return Pair(chargeCount, totalChargedKwh)
+    }
+
+    fun buildSequentialRouteHtml(tripsList: List<DrivingTrip>): String {
+        if (tripsList.isEmpty()) return ""
+        val sorted = tripsList.sortedBy { it.timestamp }
+        val points = mutableListOf<String>()
+        sorted.forEachIndexed { idx, trip ->
+            if (idx == 0) points.add(trip.startDong)
+            points.add(trip.endDong)
+        }
+        val uniquePoints = mutableListOf<String>()
+        points.forEachIndexed { i, pt ->
+            if (i == 0 || pt != points[i - 1]) uniquePoints.add(pt)
+        }
+        return uniquePoints.joinToString(" → ")
+    }
+
+    private fun parseIsoDate(dateStr: String?): Date {
+        if (dateStr == null) return Date()
+        return try {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).parse(dateStr) ?: Date()
+        } catch (e: Exception) { Date() }
     }
 }

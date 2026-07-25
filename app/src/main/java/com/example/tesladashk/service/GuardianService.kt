@@ -79,9 +79,9 @@ class GuardianService : Service() {
                             val target = if (isDoorOpen && isTrunkOpen) "문/트렁크" else if (isDoorOpen) "도어" else "트렁크"
                             ntfyApi.sendNotification(
                                 topic = topic,
-                                title = "🚨 테슬라 $target 무단 열림",
+                                title = "🚨 테슬라 ${target} 무단 열림",
                                 priority = "high",
-                                message = "차량이 잠긴 상태에서 $target가 열렸습니다!"
+                                message = "차량이 잠긴 상태에서 ${target}가 열렸습니다!"
                             )
                         }
 
