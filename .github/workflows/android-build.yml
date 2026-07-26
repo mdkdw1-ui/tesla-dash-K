@@ -19,14 +19,9 @@ jobs:
       with:
         distribution: 'temurin'
         java-version: '17'
-        cache: 'gradle'
 
-    - name: Generate Gradle Wrapper if missing
-      run: |
-        if [ ! -f "gradlew" ]; then
-          echo "gradlew not found. Generating Gradle Wrapper..."
-          gradle wrapper
-        fi
+    - name: Setup Gradle (캐싱으로 빌드 속도 대폭 향상)
+      uses: gradle/actions/setup-gradle@v3
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
