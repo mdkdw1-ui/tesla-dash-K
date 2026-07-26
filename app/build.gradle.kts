@@ -62,7 +62,6 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
 
-    // Supabase, Ktor & Serialization
     implementation(libs.supabase.postgrest)
     implementation(libs.supabase.gotrue)
     implementation(libs.supabase.realtime)
@@ -70,7 +69,5 @@ dependencies {
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
     implementation(libs.kotlinx.serialization.json)
-
-    // AES-256 Crypto Security
     implementation(libs.androidx.security.crypto)
 }
