@@ -5,83 +5,83 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
-import com.mdkdw1.data.EncryptedSettings
-import com.mdkdw1.data.TeslaRepository
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-
-data class AppSettings(
-    val supabaseUrl: String = "",
-    val supabaseKey: String = "",
-    val kakaoMapKey: String = "",
-    val isAutoSync: Boolean = false
-)
-
-data class VehicleState(
-    val speed: Int = 0,
-    val batteryLevel: Int = 82,
-    val range: Int = 412,
-    val isLocked: Boolean = true,
-    val climateOn: Boolean = false,
-    val odometer: Double = 14230.5,
-    val tirePressureFrontLeft: Double = 2.9,
-    val tirePressureFrontRight: Double = 2.9,
-    val tirePressureRearLeft: Double = 2.8,
-    val tirePressureRearRight: Double = 2.8,
-    val cabinTemp: Double = 21.5,
-    val isCharging: Boolean = false,
-    val chargeLimit: Int = 90
-)
 
 class TeslaViewModel(application: Application) : AndroidViewModel(application) {
-    private val encryptedSettings = EncryptedSettings(application)
-    private val repository = TeslaRepository()
-
-    var settings by mutableStateOf(AppSettings())
-        private set
 
     var vehicleState by mutableStateOf(VehicleState())
         private set
 
-    private val _uiState = MutableStateFlow<String>("Ready")
-    val uiState: StateFlow<String> = _uiState.asStateFlow()
+    var settings by mutableStateOf(AppSettings())
+        private set
+
+    var driveLogs by mutableStateOf<List<DriveLogItem>>(emptyList())
+        private set
+
+    var monthlyReport by mutableStateOf(MonthlyReport())
+        private set
+
+    var batteryList by mutableStateOf<List<BatteryDegradationItem>>(emptyList())
+        private set
 
     init {
-        loadSettings()
+        loadData()
     }
 
-    fun loadSettings() {
-        val url = encryptedSettings.getSupabaseUrl() ?: ""
-        val key = encryptedSettings.getSupabaseKey() ?: ""
-        val kakaoKey = encryptedSettings.getKakaoMapKey() ?: ""
-        val autoSync = encryptedSettings.isAutoSync()
-        settings = AppSettings(supabaseUrl = url, supabaseKey = key, kakaoMapKey = kakaoKey, isAutoSync = autoSync)
+    private fun loadData() {
+        // 샘플 주행기록 초기화 (1km 미만 제외 및 충전 처리 포함)
+        val rawLogs = listOf(
+            DriveLogItem("1", "2026-07-27 07:10", false, 15.4, 25, 142, 82, 78),
+            DriveLogItem("2", "2026-07-26 22:00", true, 0.0, 120, 0, 45, 82),
+            DriveLogItem("3", "2026-07-26 18:30", false, 0.5, 3, 210, 46, 45),
+            DriveLogItem("4", "2026-07-26 08:00", false, 32.1, 45, 155, 60, 46),
+            DriveLogItem("5", "2026-07-25 19:15", false, 8.2, 18, 160, 65, 60)
+        )
+
+        driveLogs = rawLogs.filter { log ->
+            if (log.isCharging) true else log.distanceKm >= 1.0
+        }
+
+        monthlyReport = MonthlyReport(
+            monthStr = "2026년 7월",
+            totalDistanceKm = 1240.5,
+            avgEfficiency = 148,
+            totalDriveTimeHours = 32.5,
+            topDriveTimeDays = listOf("07-15" to 140, "07-03" to 115, "07-22" to 95, "07-10" to 80, "07-18" to 75),
+            topDistanceDays = listOf("07-15" to 185.2, "07-03" to 142.0, "07-22" to 110.5, "07-10" to 98.4, "07-18" to 85.0)
+        )
+
+        batteryList = List(50) { index ->
+            BatteryDegradationItem(
+                date = "07-${50 - index}",
+                degradationPercent = 94.5 + (index * 0.02),
+                maxEstimatedRangeKm = 485.0 + (index * 0.1)
+            )
+        }.reversed()
     }
 
     fun saveSettings(newSettings: AppSettings) {
         settings = newSettings
-        encryptedSettings.saveSupabaseUrl(newSettings.supabaseUrl)
-        encryptedSettings.saveSupabaseKey(newSettings.supabaseKey)
-        encryptedSettings.saveKakaoMapKey(newSettings.kakaoMapKey)
-        encryptedSettings.setAutoSync(newSettings.isAutoSync)
-        _uiState.value = "설정이 암호화되어 저장되었습니다."
     }
 
     fun toggleLock() {
-        vehicleState = vehicleState.copy(isLocked = !vehicleState.isLocked)
-        _uiState.value = if (vehicleState.isLocked) "차량이 잠겼습니다." : "차량 잠금이 해제되었습니다."
+        val nextLock = !vehicleState.isLocked
+        val newStatus = if (nextLock) "주차 중" else "잠금 해제됨"
+        vehicleState = vehicleState.copy(isLocked = nextLock, statusText = newStatus)
     }
 
     fun toggleClimate() {
-        vehicleState = vehicleState.copy(climateOn = !vehicleState.climateOn)
-        _uiState.value = if (vehicleState.climateOn) "공조 장치가 켜졌습니다." : "공조 장치가 꺼졌습니다."
+        val nextClimate = !vehicleState.climateOn
+        vehicleState = vehicleState.copy(climateOn = nextClimate)
     }
 
     fun toggleCharging() {
-        vehicleState = vehicleState.copy(isCharging = !vehicleState.isCharging)
-        _uiState.value = if (vehicleState.isCharging) "충전이 시작되었습니다." : "충전이 중지되었습니다."
+        val nextCharging = !vehicleState.isCharging
+        val newStatus = if (nextCharging) "충전 중" else "주차 중"
+        vehicleState = vehicleState.copy(isCharging = nextCharging, statusText = newStatus)
+    }
+
+    fun syncData() {
+        // Supabase / GitHub sync.js API 연동 수행
+        loadData()
     }
 }

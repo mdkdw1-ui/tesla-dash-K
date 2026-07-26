@@ -1,6 +1,5 @@
 package com.mdkdw1.ui.tesla
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -17,10 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.text.SimpleDateFormat
-import java.util.*
 
-// 다크 테마 색상 팔레트
 val DarkBackground = Color(0xFF0D0E12)
 val DarkCard = Color(0xFF161820)
 val DarkBorder = Color(0xFF262936)
@@ -30,119 +26,22 @@ val AccentAmber = Color(0xFFD97706)
 val AccentBlue = Color(0xFF3B82F6)
 val AccentGreen = Color(0xFF10B981)
 
-// 앱 설정 모델 (암호화 저장 대상)
-data class AppSettings(
-    val supabaseUrl: String = "",
-    val supabaseKey: String = "",
-    val githubKey: String = ""
-)
-
-// 차량 상태 모델
-data class VehicleState(
-    val statusText: String = "주차 중",
-    val batteryLevel: Int = 78,
-    val totalOdometer: Double = 45210.5,
-    val lastUpdatedTimestamp: Long = System.currentTimeMillis() - (3 * 3600 * 1000 + 25 * 60 * 1000), // 3시간 25분 전
-    val flTire: Double = 41.2,
-    val frTire: Double = 41.5,
-    val rlTire: Double = 40.8,
-    val rrTire: Double = 41.0
-)
-
-// 주행/충전 기록 모델
-data class DriveLogItem(
-    val id: String,
-    val date: String,
-    val isCharging: Boolean,
-    val distanceKm: Double,
-    val durationMinutes: Int,
-    val efficiencyWhKm: Int,
-    val batteryStart: Int,
-    val batteryEnd: Int
-)
-
-// 월간 리포트 데이터 모델
-data class MonthlyReport(
-    val monthStr: String,
-    val totalDistanceKm: Double,
-    val avgEfficiency: Int,
-    val totalDriveTimeHours: Double,
-    val topDriveTimeDays: List<Pair<String, Int>>, // 날짜, 분
-    val topDistanceDays: List<Pair<String, Double>> // 날짜, km
-)
-
-// 배터리 열화 데이터 모델 (최근 50개)
-data class BatteryDegradationItem(
-    val date: String,
-    val degradationPercent: Double,
-    val maxEstimatedRangeKm: Double
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TeslaMainScreen() {
-    // 임시 상태 관리 (실제 구현 시 ViewModel 연동)
+fun TeslaMainScreen(viewModel: TeslaViewModel) {
     var mainTabState by remember { mutableIntStateOf(0) } // 0: 테슬라 모니터, 1: 감시 가디언
     var subTabState by remember { mutableIntStateOf(0) }  // 0: 차량정보, 1: 주행정보, 2: 월간리포트, 3: 배터리
 
     var isSyncing by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
-    var settings by remember { mutableStateOf(AppSettings()) }
 
-    val vehicleState = remember { VehicleState() }
+    val vehicleState = viewModel.vehicleState
+    val settings = viewModel.settings
+    val driveLogs = viewModel.driveLogs
+    val monthlyReport = viewModel.monthlyReport
+    val batteryList = viewModel.batteryList
 
-    // 샘플 주행/충전 데이터 (1km 미만 주행은 제외, 주행거리 변화 없이 배터리 1% 이상 상승 시 충전 처리)
-    val rawLogs = remember {
-        listOf(
-            DriveLogItem("1", "2026-07-27 07:10", false, 15.4, 25, 142, 82, 78),
-            DriveLogItem("2", "2026-07-26 22:00", true, 0.0, 120, 0, 45, 82), // 충전
-            DriveLogItem("3", "2026-07-26 18:30", false, 0.5, 3, 210, 46, 45),  // 1km 미만 -> 제거 대상
-            DriveLogItem("4", "2026-07-26 08:00", false, 32.1, 45, 155, 60, 46),
-            DriveLogItem("5", "2026-07-25 19:15", false, 8.2, 18, 160, 65, 60)
-        )
-    }
-
-    // 조건 적용된 최종 운행기록일지 필터링
-    val filteredLogs = remember(rawLogs) {
-        rawLogs.filter { log ->
-            if (log.isCharging) {
-                true
-            } else {
-                // 1km 미만 주행은 안 보여줌
-                log.distanceKm >= 1.0
-            }
-        }
-    }
-
-    // 최근 운행일 데이터
-    val lastDriveLog = filteredLogs.firstOrNull { !it.isCharging }
-
-    // 월간 리포트 샘플 데이터
-    val monthlyReport = remember {
-        MonthlyReport(
-            monthStr = "2026년 7월",
-            totalDistanceKm = 1240.5,
-            avgEfficiency = 148,
-            totalDriveTimeHours = 32.5,
-            topDriveTimeDays = listOf(
-                "07-15" to 140, "07-03" to 115, "07-22" to 95, "07-10" to 80, "07-18" to 75
-            ),
-            topDistanceDays = listOf(
-                "07-15" to 185.2, "07-03" to 142.0, "07-22" to 110.5, "07-10" to 98.4, "07-18" to 85.0
-            )
-        )
-    }
-
-    // 배터리 최근 50개 데이터 샘플
-    val batteryDataList = remember {
-        List(50) { index ->
-            BatteryDegradationItem(
-                date = "07-${50 - index}",
-                degradationPercent = 94.5 + (index * 0.02),
-                maxEstimatedRangeKm = 485.0 + (index * 0.1)
-            )
-        }.reversed()
-    }
+    val lastDriveLog = driveLogs.firstOrNull { !it.isCharging }
 
     Scaffold(
         topBar = {
@@ -156,10 +55,9 @@ fun TeslaMainScreen() {
                     )
                 },
                 actions = {
-                    // 데이터 싱크 갱신 버튼
                     IconButton(onClick = {
                         isSyncing = true
-                        // TODO: api/sync.js 연동 갱신 수행
+                        viewModel.syncData()
                         isSyncing = false
                     }) {
                         Icon(
@@ -168,7 +66,6 @@ fun TeslaMainScreen() {
                             tint = if (isSyncing) AccentAmber else TextPrimary
                         )
                     }
-                    // 설정 버튼
                     IconButton(onClick = { showSettingsDialog = true }) {
                         Icon(
                             Icons.Default.Settings,
@@ -187,7 +84,6 @@ fun TeslaMainScreen() {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // 상단 메인 탭 (테슬라 모니터 / 감시 가디언)
             TabRow(
                 selectedTabIndex = mainTabState,
                 containerColor = DarkCard,
@@ -207,7 +103,6 @@ fun TeslaMainScreen() {
             }
 
             if (mainTabState == 0) {
-                // 테슬라 모니터 하위 4개 탭
                 ScrollableTabRow(
                     selectedTabIndex = subTabState,
                     containerColor = DarkCard,
@@ -225,52 +120,46 @@ fun TeslaMainScreen() {
                     }
                 }
 
-                // 하위 탭별 메인 컨텐츠 영역
                 Box(modifier = Modifier.fillMaxSize()) {
                     when (subTabState) {
                         0 -> VehicleInfoTabContent(
                             vehicleState = vehicleState,
                             lastDriveLog = lastDriveLog,
-                            driveLogs = filteredLogs
+                            driveLogs = driveLogs,
+                            viewModel = viewModel
                         )
-                        1 -> DriveInfoTabContent(driveLogs = filteredLogs)
+                        1 -> DriveInfoTabContent(driveLogs = driveLogs)
                         2 -> MonthlyReportTabContent(report = monthlyReport)
-                        3 -> BatteryTabContent(batteryList = batteryDataList)
+                        3 -> BatteryTabContent(batteryList = batteryList)
                     }
                 }
             } else {
-                // 감시 가디언 탭
                 GuardianTabContent()
             }
         }
     }
 
-    // 설정 입력 및 암호화 저장 다이얼로그
     if (showSettingsDialog) {
         SettingsDialog(
             currentSettings = settings,
             onDismiss = { showSettingsDialog = false },
             onSave = { updatedSettings ->
-                settings = updatedSettings
-                // TODO: EncryptedSharedPreferences 저장 처리
+                viewModel.saveSettings(updatedSettings)
                 showSettingsDialog = false
             }
         )
     }
 }
 
-// -------------------------------------------------------------------
-// 1. 차량정보 탭
-// -------------------------------------------------------------------
 @Composable
 fun VehicleInfoTabContent(
     vehicleState: VehicleState,
     lastDriveLog: DriveLogItem?,
-    driveLogs: List<DriveLogItem>
+    driveLogs: List<DriveLogItem>,
+    viewModel: TeslaViewModel
 ) {
     val scrollState = rememberScrollState()
 
-    // 주차 경과 시간 계산 (현재 시간 - 마지막 데이터 받기 시각)
     val diffMillis = System.currentTimeMillis() - vehicleState.lastUpdatedTimestamp
     val parkedHours = diffMillis / (1000 * 60 * 60)
     val parkedMinutes = (diffMillis % (1000 * 60 * 60)) / (1000 * 60)
@@ -297,14 +186,50 @@ fun VehicleInfoTabContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    StatusItem("상태", vehicleState.statusText, "테슬라 API 연동")
-                    StatusItem("배터리 잔량", "${vehicleState.batteryLevel}%", "Supabase 연동")
-                    StatusItem("총 주행거리", "${String.format("%.1f", vehicleState.totalOdometer)} km", "Supabase 연동")
+                    StatusItem("상태", vehicleState.statusText, "테슬라 API")
+                    StatusItem("배터리 잔량", "${vehicleState.batteryLevel}%", "Supabase")
+                    StatusItem("총 주행거리", "${String.format("%.1f", vehicleState.odometer)} km", "Supabase")
                 }
             }
         }
 
-        // [2] 주차 시간
+        // [2] 원격 제어
+        Card(
+            colors = CardDefaults.cardColors(containerColor = DarkCard),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("원격 제어", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { viewModel.toggleLock() },
+                        colors = ButtonDefaults.buttonColors(containerColor = if (vehicleState.isLocked) AccentBlue else Color.DarkGray),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(if (vehicleState.isLocked) "잠김 해제" else "잠금")
+                    }
+                    Button(
+                        onClick = { viewModel.toggleClimate() },
+                        colors = ButtonDefaults.buttonColors(containerColor = if (vehicleState.climateOn) AccentAmber else Color.DarkGray),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(if (vehicleState.climateOn) "공조 끄기" else "공조 켜기")
+                    }
+                    Button(
+                        onClick = { viewModel.toggleCharging() },
+                        colors = ButtonDefaults.buttonColors(containerColor = if (vehicleState.isCharging) Color.Red else Color.DarkGray),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(if (vehicleState.isCharging) "충전 중지" else "충전 시작")
+                    }
+                }
+            }
+        }
+
+        // [3] 주차 시간
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -327,7 +252,7 @@ fun VehicleInfoTabContent(
             }
         }
 
-        // [3] 최근 운행일 전체기록
+        // [4] 최근 운행일 전체기록
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -349,7 +274,7 @@ fun VehicleInfoTabContent(
             }
         }
 
-        // [4] 타이어 공기압 (PSI)
+        // [5] 타이어 공기압 (PSI)
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -370,7 +295,7 @@ fun VehicleInfoTabContent(
             }
         }
 
-        // [5] 운행기록일지 (주행 / 충전 구분, 1km 미만 제외)
+        // [6] 운행기록일지 (1km 미만 제외)
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -389,9 +314,6 @@ fun VehicleInfoTabContent(
     }
 }
 
-// -------------------------------------------------------------------
-// 2. 주행정보 탭
-// -------------------------------------------------------------------
 @Composable
 fun DriveInfoTabContent(driveLogs: List<DriveLogItem>) {
     val scrollState = rememberScrollState()
@@ -423,9 +345,6 @@ fun DriveInfoTabContent(driveLogs: List<DriveLogItem>) {
     }
 }
 
-// -------------------------------------------------------------------
-// 3. 월간리포트 탭
-// -------------------------------------------------------------------
 @Composable
 fun MonthlyReportTabContent(report: MonthlyReport) {
     val scrollState = rememberScrollState()
@@ -451,7 +370,6 @@ fun MonthlyReportTabContent(report: MonthlyReport) {
             }
         }
 
-        // 운전시간 TOP 5
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -468,7 +386,6 @@ fun MonthlyReportTabContent(report: MonthlyReport) {
             }
         }
 
-        // 운전거리 TOP 5
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -487,9 +404,6 @@ fun MonthlyReportTabContent(report: MonthlyReport) {
     }
 }
 
-// -------------------------------------------------------------------
-// 4. 배터리 탭 (최근 50개 기준 열화율 및 주행가능거리)
-// -------------------------------------------------------------------
 @Composable
 fun BatteryTabContent(batteryList: List<BatteryDegradationItem>) {
     val scrollState = rememberScrollState()
@@ -517,7 +431,6 @@ fun BatteryTabContent(batteryList: List<BatteryDegradationItem>) {
             }
         }
 
-        // 최근 50개 상세 기록 목록
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -541,9 +454,6 @@ fun BatteryTabContent(batteryList: List<BatteryDegradationItem>) {
     }
 }
 
-// -------------------------------------------------------------------
-// 5. 감시 가디언 탭
-// -------------------------------------------------------------------
 @Composable
 fun GuardianTabContent() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -551,9 +461,6 @@ fun GuardianTabContent() {
     }
 }
 
-// -------------------------------------------------------------------
-// 보조 UI 컴포넌트 및 다이얼로그
-// -------------------------------------------------------------------
 @Composable
 fun StatusItem(title: String, value: String, subtext: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -602,6 +509,7 @@ fun SettingsDialog(
 ) {
     var supabaseUrl by remember { mutableStateOf(currentSettings.supabaseUrl) }
     var supabaseKey by remember { mutableStateOf(currentSettings.supabaseKey) }
+    var kakaoMapKey by remember { mutableStateOf(currentSettings.kakaoMapKey) }
     var githubKey by remember { mutableStateOf(currentSettings.githubKey) }
 
     AlertDialog(
@@ -620,7 +528,15 @@ fun SettingsDialog(
                 OutlinedTextField(
                     value = supabaseKey,
                     onValueChange = { supabaseKey = it },
-                    label = { Text("Supabase API Key") },
+                    label = { Text("Supabase Key") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue)
+                )
+                OutlinedTextField(
+                    value = kakaoMapKey,
+                    onValueChange = { kakaoMapKey = it },
+                    label = { Text("Kakao Map Key") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue)
@@ -638,7 +554,7 @@ fun SettingsDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    onSave(AppSettings(supabaseUrl, supabaseKey, githubKey))
+                    onSave(AppSettings(supabaseUrl, supabaseKey, kakaoMapKey, githubKey, currentSettings.isAutoSync))
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
             ) {
