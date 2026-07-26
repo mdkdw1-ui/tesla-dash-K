@@ -1,72 +1,59 @@
 package com.mdkdw1.ui.tesla
 
-// 앱 암호화 설정 모델
-data class AppConfig(
-    val supabaseUrl: String = "",
-    val supabaseKey: String = "",
-    val kakaoMapKey: String = "",
-    val refreshIntervalSec: Int = 30
-)
+import android.content.Context
+import android.content.SharedPreferences
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 
-// 차량 상태 모델
-data class VehicleState(
-    val vehicleName: String = "Tesla Model Y",
-    val batteryLevel: Int = 82,
-    val usableBatteryLevel: Int = 80,
-    val isCharging: Boolean = false,
-    val chargeState: String = "Disconnected",
-    val estimatedRangeKm: Double = 385.0,
-    val odometerKm: Double = 24500.0,
-    val insideTempC: Double = 21.5,
-    val outsideTempC: Double = 18.0,
-    val isLocked: Boolean = true,
-    val isSentryMode: Boolean = true,
-    val isClimateOn: Boolean = false,
-    val speedKmh: Double = 0.0,
-    val gear: String = "P",
-    val latitude: Double = 37.5665,
-    val longitude: Double = 126.9780
-)
+class EncryptedSettingsManager(context: Context) {
 
-// 일일 주행 데이터
-data class DailyTrip(
-    val date: String = "",
-    val distanceKm: Double = 0.0,
-    val energyKwh: Double = 0.0,
-    val efficiencyWhKm: Double = 0.0,
-    val batteryUsedPercent: Double = 0.0
-)
+    private val masterKey = MasterKey.Builder(context)
+        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+        .build()
 
-// 배터리 열화 데이터
-data class BatteryDegradation(
-    val odometerKm: Double = 0.0,
-    val maxCapacityKwh: Double = 0.0,
-    val degradationPercent: Double = 0.0,
-    val recordDate: String = ""
-)
+    private val prefs: SharedPreferences = EncryptedSharedPreferences.create(
+        context,
+        "tesla_secure_prefs",
+        masterKey,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
 
-// 충전 기록
-data class ChargeRecord(
-    val id: String = "",
-    val date: String = "",
-    val startPercent: Int = 0,
-    val endPercent: Int = 0,
-    val energyAddedKwh: Double = 0.0,
-    val costKrw: Int = 0,
-    val location: String = ""
-)
+    fun getConfig(): AppConfig {
+        return AppConfig(
+            supabaseUrl = prefs.getString("supabase_url", "") ?: "",
+            supabaseKey = prefs.getString("supabase_key", "") ?: "",
+            kakaoMapKey = prefs.getString("kakao_map_key", "") ?: "",
+            vehicleId = prefs.getString("vehicle_id", "") ?: ""
+        )
+    }
 
-// 소모품 항목
-data class ConsumableItem(
-    val id: String = "",
-    val name: String = "",
-    val lastReplacedKm: Double = 0.0,
-    val intervalKm: Double = 20000.0,
-    val currentOdometerKm: Double = 24500.0
-) {
-    val remainingKm: Double
-        get() = (lastReplacedKm + intervalKm) - currentOdometerKm
-        
-    val healthPercent: Int
-        get() = ((remainingKm / intervalKm) * 100).coerceIn(0.0, 100.0).toInt()
+    fun saveConfig(config: AppConfig) {
+        prefs.edit().apply {
+            putString("supabase_url", config.supabaseUrl)
+            putString("supabase_key", config.supabaseKey)
+            putString("kakao_map_key", config.kakaoMapKey)
+            putString("vehicle_id", config.vehicleId)
+            apply()
+        }
+    }
+
+    fun loadConfig(): AppConfig = getConfig()
+    fun getAppConfig(): AppConfig = getConfig()
+    fun saveAppConfig(config: AppConfig) = saveConfig(config)
+
+    fun getSupabaseUrl(): String = prefs.getString("supabase_url", "") ?: ""
+    fun saveSupabaseUrl(url: String) = prefs.edit().putString("supabase_url", url).apply()
+
+    fun getSupabaseKey(): String = prefs.getString("supabase_key", "") ?: ""
+    fun saveSupabaseKey(key: String) = prefs.edit().putString("supabase_key", key).apply()
+
+    fun getKakaoMapKey(): String = prefs.getString("kakao_map_key", "") ?: ""
+    fun saveKakaoMapKey(key: String) = prefs.edit().putString("kakao_map_key", key).apply()
+
+    fun getVehicleId(): String = prefs.getString("vehicle_id", "") ?: ""
+    fun saveVehicleId(id: String) = prefs.edit().putString("vehicle_id", id).apply()
 }
+
+// TeslaHubUI 및 기타 UI 호환성을 위한 타입 별칭
+typealias SecureSettingsManager = EncryptedSettingsManager

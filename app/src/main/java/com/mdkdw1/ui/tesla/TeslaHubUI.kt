@@ -1,531 +1,486 @@
 package com.mdkdw1.ui.tesla
 
-import android.annotation.SuppressLint
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import android.widget.Toast
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.launch
 
-// ==========================================
-// 다크 모드 디자인 테마 색상 정의
-// ==========================================
-val DarkBackground = Color(0xFF0D0E12)
-val CardDark = Color(0xFF161820)
-val CardBorder = Color(0xFF262936)
-val TextLight = Color(0xFFF3F4F6)
-val TextGray = Color(0xFF9CA3AF)
-val AccentBlue = Color(0xFF3B82F6)
-val AccentRed = Color(0xFFEF4444)
-val AccentGreen = Color(0xFF10B981)
-val AccentAmber = Color(0xFFF59E0B)
-val AccentIndigo = Color(0xFF6366F1)
-val AmberBorder = Color(0xFFD97706)
+// 다크 모드 디자인 색상 시스템
+val DarkBg = Color(0xFF0D0E12)
+val DarkCardBg = Color(0xFF161820)
+val DarkBorder = Color(0xFF262936)
+val PrimaryAccent = Color(0xFF3B82F6)
+val TextPrimary = Color(0xFFEEEEEE)
+val TextSecondary = Color(0xFF9CA3AF)
 
-// ==========================================
-// 메인 Hub 스크린 컴포저블
-// ==========================================
 @Composable
-fun MainHubScreen(
-    repository: TeslaHubRepository,
-    settingsManager: SecureSettingsManager
-) {
-    val vehicleData by repository.vehicleData.collectAsState()
-    val batteryRecords by repository.batteryRecords.collectAsState()
+fun TeslaHubScreen() {
+    val context = LocalContext.current
+    val repository = remember { TeslaHubRepository(context) }
+    val settingsManager = remember { SecureSettingsManager(context) }
+    val scope = rememberCoroutineScope()
 
-    var selectedMainTab by remember { mutableIntStateOf(0) } // 0: 테슬라 모니터, 1: 감시 가디언
-    var selectedSubTab by remember { mutableIntStateOf(0) }  // 0: 차량정보, 1: 주행지도, 2: 월간리포트, 3: 배터리그래프
-    var showSettingsModal by remember { mutableStateOf(false) }
+    var currentTab by remember { mutableIntStateOf(0) }
+    var vehicleState by remember { mutableStateOf<VehicleStateData?>(null) }
+    var dailyTrip by remember { mutableStateOf<DailyTrip?>(null) }
+    var batteryRecords by remember { mutableStateOf<List<BatteryRecord>>(emptyList()) }
+    var chargeRecords by remember { mutableStateOf<List<ChargeRecord>>(emptyList()) }
+    var consumables by remember { mutableStateOf<List<ConsumableItem>>(emptyList()) }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = DarkBackground
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState())
-        ) {
-            // 1. 상단 타이틀 바 & 설정 버튼
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("⚡ Tesla Command Hub", color = TextLight, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(AccentGreen, CircleShape)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("온라인", color = AccentGreen, fontSize = 12.sp)
-                }
-                IconButton(onClick = { showSettingsModal = true }) {
-                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = TextGray)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 2. 메인 탭 셀렉터 (테슬라 모니터 / 🛡️ 감시 가디언)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .background(CardDark, RoundedCornerShape(12.dp))
-                    .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
-                    .padding(4.dp)
-            ) {
-                TabButton(
-                    text = "테슬라 모니터",
-                    isSelected = selectedMainTab == 0,
-                    activeColor = AccentBlue,
-                    modifier = Modifier.weight(1f)
-                ) { selectedMainTab = 0 }
-
-                Spacer(modifier = Modifier.width(4.dp))
-
-                TabButton(
-                    text = "🛡️ 감시 가디언",
-                    isSelected = selectedMainTab == 1,
-                    activeColor = AccentIndigo,
-                    modifier = Modifier.weight(1f)
-                ) { selectedMainTab = 1 }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 3. 메인 탭 전환 패널
-            if (selectedMainTab == 0) {
-                // 서브 탭 (차량 정보, 주행 지도, 월간 리포트, 배터리 그래프)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    val subTabs = listOf("차량 정보", "주행 지도", "월간 리포트", "배터리 그래프")
-                    subTabs.forEachIndexed { index, title ->
-                        FilterChip(
-                            selected = selectedSubTab == index,
-                            onClick = { selectedSubTab = index },
-                            label = { Text(title, fontSize = 12.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AccentBlue,
-                                selectedLabelColor = TextLight,
-                                containerColor = CardDark,
-                                labelColor = TextGray
-                            )
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                when (selectedSubTab) {
-                    0 -> VehicleInfoSubTab(vehicleData, repository)
-                    1 -> KakaoMapWebView(vehicleData.lat, vehicleData.lng, settingsManager.getConfig().kakaoKey)
-                    2 -> MonthlyReportSubTab()
-                    3 -> BatteryHealthSubTab(batteryRecords)
-                }
-            } else {
-                GuardianTabScreen(vehicleData, repository)
-            }
+    LaunchedEffect(Unit) {
+        scope.launch {
+            vehicleState = repository.fetchVehicleState()
+            dailyTrip = repository.fetchLatestDailyTrip()
+            batteryRecords = repository.fetchBatteryDegradation()
+            chargeRecords = repository.fetchChargeRecords()
+            consumables = repository.fetchConsumables()
         }
     }
 
-    if (showSettingsModal) {
-        SettingsDialog(
-            settingsManager = settingsManager,
-            onDismiss = { showSettingsModal = false }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DarkBg)
+            .padding(16.dp)
+    ) {
+        // 상단 헤더
+        Text(
+            text = "TESLA DASHBOARD",
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextPrimary,
+            modifier = Modifier.padding(bottom = 16.dp)
         )
+
+        // 탭 네비게이션
+        TabRow(
+            selectedTabIndex = currentTab,
+            containerColor = DarkCardBg,
+            contentColor = PrimaryAccent,
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, DarkBorder, RoundedCornerShape(8.dp))
+        ) {
+            val tabs = listOf("대시보드", "배터리열화", "충전기록", "소모품", "설정")
+            tabs.forEachIndexed { index, title ->
+                Tab(
+                    selected = currentTab == index,
+                    onClick = { currentTab = index },
+                    text = {
+                        Text(
+                            text = title,
+                            color = if (currentTab == index) PrimaryAccent else TextSecondary,
+                            fontSize = 13.sp
+                        )
+                    }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 탭 콘텐츠
+        Box(modifier = Modifier.weight(1f)) {
+            when (currentTab) {
+                0 -> DashboardTabContent(vehicleState = vehicleState, dailyTrip = dailyTrip)
+                1 -> BatteryTabContent(batteryRecords = batteryRecords)
+                2 -> ChargeRecordsTabContent(chargeRecords = chargeRecords)
+                3 -> ConsumablesTabContent(consumables = consumables)
+                4 -> SettingsTabContent(settingsManager = settingsManager)
+            }
+        }
     }
 }
 
-// ==========================================
-// 차량 정보 서브탭
-// ==========================================
 @Composable
-fun VehicleInfoSubTab(data: VehicleStateData, repository: TeslaHubRepository) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // 차량 상태 카드
+fun DashboardTabContent(vehicleState: VehicleStateData?, dailyTrip: DailyTrip?) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // 차량 기본 정보 카드
         Card(
-            colors = CardDefaults.cardColors(containerColor = CardDark),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = DarkCardBg),
+            shape = RoundedCornerShape(12.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("차량 상태", color = TextGray, fontSize = 12.sp)
-                Text(data.statusText, color = TextLight, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = vehicleState?.vehicleName ?: "Tesla Vehicle",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
                 Spacer(modifier = Modifier.height(8.dp))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text("배터리 잔량", color = TextGray, fontSize = 11.sp)
-                        Text("${data.batteryLevel}%", color = AccentGreen, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text(text = "배터리 잔량", fontSize = 12.sp, color = TextSecondary)
+                        Text(
+                            text = "${vehicleState?.batteryLevel ?: 0}%",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PrimaryAccent
+                        )
                     }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("예상 주행거리", color = TextGray, fontSize = 11.sp)
-                        Text("${data.batteryRangeKm} km", color = TextLight, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Column {
+                        Text(text = "주행 가능 거리", fontSize = 12.sp, color = TextSecondary)
+                        Text(
+                            text = "${vehicleState?.batteryRangeKm ?: 0.0} km",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                    }
+                    Column {
+                        Text(text = "잠금 상태", fontSize = 12.sp, color = TextSecondary)
+                        Text(
+                            text = if (vehicleState?.isLocked == true) "잠김" else "열림",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = TextPrimary
+                        )
                     }
                 }
             }
         }
 
-        // 빠른 제어 버튼 그룹
-        Text("빠른 차량 제어", color = TextGray, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = { repository.toggleLock() },
-                colors = ButtonDefaults.buttonColors(containerColor = if (data.isLocked) AccentBlue else AccentRed),
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(if (data.isLocked) "도어 잠김" else "도어 해제됨")
-            }
-
-            Button(
-                onClick = { repository.toggleClimate() },
-                colors = ButtonDefaults.buttonColors(containerColor = if (data.isClimateOn) AccentGreen else CardDark),
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(if (data.isClimateOn) "공조 ON (${data.insideTemp}°C)" else "공조 OFF")
-            }
-        }
-
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = { repository.triggerFrunk() },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("프렁크 열기", color = TextLight)
-            }
-            OutlinedButton(
-                onClick = { repository.triggerTrunk() },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("트렁크 열기", color = TextLight)
-            }
-        }
-    }
-}
-
-// ==========================================
-// 감시 가디언 탭
-// ==========================================
-@Composable
-fun GuardianTabScreen(data: VehicleStateData, repository: TeslaHubRepository) {
-    val context = LocalContext.current
-    val alertMessage = repository.checkGuardianSecurityAlert()
-
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (alertMessage != null) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF3F1D1D)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, AccentRed, RoundedCornerShape(12.dp))
-            ) {
-                Text(
-                    text = alertMessage,
-                    color = AccentRed,
-                    modifier = Modifier.padding(16.dp),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
+        // 주행 및 온도 상태
         Card(
-            colors = CardDefaults.cardColors(containerColor = CardDark),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, AmberBorder, RoundedCornerShape(12.dp))
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = DarkCardBg),
+            shape = RoundedCornerShape(12.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("🛡️ 감시 가디언 센트리 모드", color = AccentAmber, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "차량 상태",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
                 Spacer(modifier = Modifier.height(8.dp))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("센트리 모드 상태", color = TextGray, fontSize = 12.sp)
-                    Text(if (data.isSentryOn) "가동 중" else "중지됨", color = if (data.isSentryOn) AccentGreen else AccentRed, fontSize = 12.sp)
+                    Text(text = "누적 주행거리:", color = TextSecondary, fontSize = 14.sp)
+                    Text(
+                        text = "${vehicleState?.odometerKm ?: 0.0} km",
+                        color = TextPrimary,
+                        fontSize = 14.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "실내/실외 온도:", color = TextSecondary, fontSize = 14.sp)
+                    Text(
+                        text = "${vehicleState?.insideTemp ?: 0.0}°C / ${vehicleState?.outsideTemp ?: 0.0}°C",
+                        color = TextPrimary,
+                        fontSize = 14.sp
+                    )
                 }
             }
         }
+
+        // 최근 주행 트립
+        dailyTrip?.let { trip ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = DarkCardBg),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "최근 일일 트립 (${trip.date})",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "주행 거리: ${trip.distanceKm} km", color = TextSecondary, fontSize = 14.sp)
+                        Text(text = "전비: ${trip.efficiencyWhPerKm} Wh/km", color = PrimaryAccent, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BatteryTabContent(batteryRecords: List<BatteryRecord>) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item {
+            Text(
+                text = "배터리 열화율 및 용량 이력",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
+        items(batteryRecords) { record ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = DarkCardBg),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(text = record.date, fontSize = 14.sp, color = TextPrimary, fontWeight = FontWeight.Bold)
+                        Text(text = "용량: ${record.capacityKwh} kWh", fontSize = 12.sp, color = TextSecondary)
+                    }
+                    Text(
+                        text = "건강도: ${record.healthPercentage}%",
+                        fontSize = 14.sp,
+                        color = PrimaryAccent,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChargeRecordsTabContent(chargeRecords: List<ChargeRecord>) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item {
+            Text(
+                text = "충전 이력 목록",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
+        items(chargeRecords) { record ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = DarkCardBg),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = record.location, fontSize = 14.sp, color = TextPrimary, fontWeight = FontWeight.Bold)
+                        Text(text = record.date, fontSize = 12.sp, color = TextSecondary)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "충전량: ${record.addedKwh} kWh", fontSize = 13.sp, color = TextSecondary)
+                        Text(text = "비용: ${record.cost} 원", fontSize = 13.sp, color = PrimaryAccent)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ConsumablesTabContent(consumables: List<ConsumableItem>) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item {
+            Text(
+                text = "소모품 교체 주기 관리",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
+        items(consumables) { item ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = DarkCardBg),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(text = item.name, fontSize = 14.sp, color = TextPrimary, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "마지막 교체: ${item.lastReplacedKm} km",
+                            fontSize = 12.sp,
+                            color = TextSecondary
+                        )
+                    }
+                    Text(
+                        text = "주기: ${item.cycleKm} km",
+                        fontSize = 13.sp,
+                        color = TextSecondary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SettingsTabContent(settingsManager: SecureSettingsManager) {
+    val initialConfig = remember { settingsManager.getConfig() }
+
+    var supabaseUrl by remember { mutableStateOf(initialConfig.supabaseUrl) }
+    var supabaseKey by remember { mutableStateOf(initialConfig.supabaseKey) }
+    var kakaoMapKey by remember { mutableStateOf(initialConfig.kakaoMapKey) }
+    var vehicleId by remember { mutableStateOf(initialConfig.vehicleId) }
+
+    var isSaved by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "암호화 설정 관리",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextPrimary
+        )
+
+        OutlinedTextField(
+            value = supabaseUrl,
+            onValueChange = { supabaseUrl = it },
+            label = { Text("Supabase URL") },
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = PrimaryAccent,
+                unfocusedBorderColor = DarkBorder,
+                focusedLabelColor = PrimaryAccent,
+                unfocusedLabelColor = TextSecondary,
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary
+            )
+        )
+
+        OutlinedTextField(
+            value = supabaseKey,
+            onValueChange = { supabaseKey = it },
+            label = { Text("Supabase Key") },
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = PrimaryAccent,
+                unfocusedBorderColor = DarkBorder,
+                focusedLabelColor = PrimaryAccent,
+                unfocusedLabelColor = TextSecondary,
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary
+            )
+        )
+
+        OutlinedTextField(
+            value = kakaoMapKey,
+            onValueChange = { kakaoMapKey = it },
+            label = { Text("KakaoMap API Key") },
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = PrimaryAccent,
+                unfocusedBorderColor = DarkBorder,
+                focusedLabelColor = PrimaryAccent,
+                unfocusedLabelColor = TextSecondary,
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary
+            )
+        )
+
+        OutlinedTextField(
+            value = vehicleId,
+            onValueChange = { vehicleId = it },
+            label = { Text("Vehicle ID") },
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = PrimaryAccent,
+                unfocusedBorderColor = DarkBorder,
+                focusedLabelColor = PrimaryAccent,
+                unfocusedLabelColor = TextSecondary,
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary
+            )
+        )
 
         Button(
             onClick = {
-                repository.triggerFlashLights()
-                Toast.makeText(context, "비상 전조등 점등 명령 전송", Toast.LENGTH_SHORT).show()
+                val newConfig = AppConfig(
+                    supabaseUrl = supabaseUrl,
+                    supabaseKey = supabaseKey,
+                    kakaoMapKey = kakaoMapKey,
+                    vehicleId = vehicleId
+                )
+                settingsManager.saveConfig(newConfig)
+                isSaved = true
             },
-            colors = ButtonDefaults.buttonColors(containerColor = AccentAmber),
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp)
+            colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)
         ) {
-            Text("🚨 경고 비상등 점등 테스트", color = DarkBackground, fontWeight = FontWeight.Bold)
+            Text(text = "설정 보안 저장 (AES-256)", color = Color.White)
         }
-    }
-}
 
-// ==========================================
-// 배터리 열화율 차트 서브탭 (Canvas Line Chart)
-// ==========================================
-@Composable
-fun BatteryHealthSubTab(records: List<BatteryRecord>) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = CardDark),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("배터리 수명 및 열화율 추이 (%)", color = TextLight, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (records.isNotEmpty()) {
-                Canvas(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp)
-                ) {
-                    val width = size.width
-                    val height = size.height
-                    val maxVal = 100f
-                    val minVal = 95f
-
-                    val points = records.mapIndexed { index, record ->
-                        val x = index * (width / (records.size - 1))
-                        val y = height - ((record.healthPercent - minVal) / (maxVal - minVal) * height)
-                        Offset(x, y)
-                    }
-
-                    val path = Path().apply {
-                        if (points.isNotEmpty()) {
-                            moveTo(points[0].x, points[0].y)
-                            for (i in 1 until points.size) {
-                                lineTo(points[i].x, points[i].y)
-                            }
-                        }
-                    }
-
-                    drawPath(
-                        path = path,
-                        color = AccentBlue,
-                        style = Stroke(width = 4f)
-                    )
-
-                    for (p in points) {
-                        drawCircle(color = AccentGreen, radius = 6f, center = p)
-                    }
-                }
-            }
+        if (isSaved) {
+            Text(
+                text = "설정이 성공적으로 저장되었습니다.",
+                color = Color(0xFF10B981),
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
-    }
-}
-
-// ==========================================
-// 월간 리포트 서브탭
-// ==========================================
-@Composable
-fun MonthlyReportSubTab() {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = CardDark),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("📊 이번 달 주행 및 충전 리포트", color = TextLight, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("총 주행 거리", color = TextGray, fontSize = 12.sp)
-                Text("1,248 km", color = TextLight, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("평균 전비", color = TextGray, fontSize = 12.sp)
-                Text("152 Wh/km", color = AccentGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-// ==========================================
-// 카카오맵 WebView 연동
-// ==========================================
-@SuppressLint("SetJavaScriptEnabled")
-@Composable
-fun KakaoMapWebView(lat: Double, lng: Double, kakaoApiKey: String) {
-    val htmlContent = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8"/>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=$kakaoApiKey"></script>
-            <style>
-                html, body { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #0D0E12; }
-                #map { width: 100%; height: 100%; }
-            </style>
-        </head>
-        <body>
-            <div id="map"></div>
-            <script>
-                window.onload = function() {
-                    var container = document.getElementById('map');
-                    var options = { center: new kakao.maps.LatLng($lat, $lng), level: 3 };
-                    var map = new kakao.maps.Map(container, options);
-                    var marker = new kakao.maps.Marker({ position: new kakao.maps.LatLng($lat, $lng) });
-                    marker.setMap(map);
-                };
-            </script>
-        </body>
-        </html>
-    """.trimIndent()
-
-    AndroidView(
-        factory = { context ->
-            WebView(context).apply {
-                webViewClient = WebViewClient()
-                settings.javaScriptEnabled = true
-                loadDataWithBaseURL("https://dapi.kakao.com", htmlContent, "text/html", "UTF-8", null)
-            }
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(280.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
-    )
-}
-
-// ==========================================
-// 설정 다이얼로그 (AES-256 암호화 저장)
-// ==========================================
-@Composable
-fun SettingsDialog(
-    settingsManager: SecureSettingsManager,
-    onDismiss: () -> Unit
-) {
-    val context = LocalContext.current
-    val config = remember { settingsManager.getConfig() }
-
-    var supabaseUrl by remember { mutableStateOf(config.supabaseUrl) }
-    var supabaseKey by remember { mutableStateOf(config.supabaseKey) }
-    var kakaoKey by remember { mutableStateOf(config.kakaoKey) }
-    var teslaToken by remember { mutableStateOf(config.teslaToken) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = CardDark,
-        title = { Text("⚙️ API 및 보안 설정 (AES-256 암호화)", color = TextLight, fontSize = 16.sp) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = supabaseUrl,
-                    onValueChange = { supabaseUrl = it },
-                    label = { Text("Supabase URL", color = TextGray) },
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = supabaseKey,
-                    onValueChange = { supabaseKey = it },
-                    label = { Text("Supabase Key", color = TextGray) },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation()
-                )
-                OutlinedTextField(
-                    value = kakaoKey,
-                    onValueChange = { kakaoKey = it },
-                    label = { Text("Kakao Map App Key", color = TextGray) },
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = teslaToken,
-                    onValueChange = { teslaToken = it },
-                    label = { Text("Tesla Refresh Token", color = TextGray) },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation()
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    settingsManager.saveConfig(supabaseUrl, supabaseKey, kakaoKey, teslaToken)
-                    Toast.makeText(context, "AES-256 보안 저장소에 암호화 저장되었습니다.", Toast.LENGTH_SHORT).show()
-                    onDismiss()
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-            ) {
-                Text("저장")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("취소", color = TextGray)
-            }
-        }
-    )
-}
-
-// ==========================================
-// UI 공통 버튼 컴포넌트
-// ==========================================
-@Composable
-fun TabButton(
-    text: String,
-    isSelected: Boolean,
-    activeColor: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .fillMaxHeight()
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (isSelected) activeColor else Color.Transparent)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            color = if (isSelected) TextLight else TextGray,
-            fontSize = 13.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-        )
     }
 }
