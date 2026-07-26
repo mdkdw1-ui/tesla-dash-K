@@ -66,7 +66,7 @@ class MainActivity : AppCompatActivity() {
     private fun openRouteMap() {
         startActivity(
             Intent(this, KakaoRouteMapActivity::class.java)
-                .putExtra(KakaoRouteMapActivity.EXTRA_PERIOD, selectedPeriod.name)
+                .putExtra(EXTRA_PERIOD, selectedPeriod.name)
         )
     }
 
@@ -82,4 +82,8 @@ class MainActivity : AppCompatActivity() {
     private fun refreshAndSync() {}
     private fun flashLights() {}
     private fun toggleSentry() {}
+
+    companion object {
+        const val EXTRA_PERIOD = "extra_period"
+    }
 }
