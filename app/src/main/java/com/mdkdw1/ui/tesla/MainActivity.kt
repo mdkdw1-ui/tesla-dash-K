@@ -3,13 +3,11 @@ package com.mdkdw1.ui.tesla
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -77,27 +75,27 @@ fun TeslaDashApp() {
 @Composable
 fun VehicleInfoScreen() {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("내 차량정보 (도어, 트렁크, 공조 제어)", color = Color.White, fontSize = 16.sp)
+        Text("내 차량정보 (도어, 트렁크, 공조 제어 및 실시간 상태)", color = Color.White, fontSize = 16.sp)
     }
 }
 
 @Composable
 fun DrivingInfoScreen() {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("주행정보 (카카오맵 위치 및 주행 로그)", color = Color.White, fontSize = 16.sp)
+        Text("주행정보 (카카오맵 위치 추적 및 주행 기록 로그)", color = Color.White, fontSize = 16.sp)
     }
 }
 
 @Composable
 fun MonthlyReportScreen() {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("월간리포트 (충전 기록 및 비용 관리)", color = Color.White, fontSize = 16.sp)
+        Text("월간리포트 (충전 기록 및 비용 관리 분석)", color = Color.White, fontSize = 16.sp)
     }
 }
 
 @Composable
 fun BatteryScreen() {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("배터리 (SOH 열화율 및 상태 그래프)", color = Color.White, fontSize = 16.sp)
+        Text("배터리 (SOH 열화율 및 배터리 상태 그래프)", color = Color.White, fontSize = 16.sp)
     }
 }
