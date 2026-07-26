@@ -55,7 +55,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
 
-    // Compose UI
+    // Jetpack Compose UI (BOM)
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -64,7 +64,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.6.2")
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
-    // Supabase & Ktor & Serialization
+    // Supabase & Ktor & Serialization (전체 유지)
     implementation("io.github.jan-tennert.supabase:postgrest-kt:2.1.3")
     implementation("io.github.jan-tennert.supabase:gotrue-kt:2.1.3")
     implementation("io.github.jan-tennert.supabase:realtime-kt:2.1.3")
@@ -73,6 +73,6 @@ dependencies {
     implementation("io.ktor:ktor-client-cio:2.3.8")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
 
-    // Encrypted Security
+    // Encrypted Security (보안 설정 저장 유지)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 }
