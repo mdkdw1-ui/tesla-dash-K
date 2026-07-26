@@ -71,6 +71,6 @@ dependencies {
     implementation("io.ktor:ktor-client-cio:2.3.8")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
 
-    // Security (AES 암호화)
+    // Security (AES EncryptedSharedPreferences)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 }
