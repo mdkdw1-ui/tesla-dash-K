@@ -2,13 +2,25 @@ package com.mdkdw1.ui.tesla
 
 import java.util.Date
 
-// 메인 탭 정의
+// ==========================================
+// 1. 앱 설정 모델 (Encrypted Settings)
+// ==========================================
+data class AppSettings(
+    val supabaseUrl: String = "",
+    val supabaseKey: String = "",
+    val kakaoMapKey: String = "",
+    val teslaAccessToken: String = "",
+    val githubToken: String = ""
+)
+
+// ==========================================
+// 2. Navigation & Tab Enums
+// ==========================================
 enum class MainTab(val title: String) {
     MONITOR("테슬라 모니터"),
     GUARDIAN("감시 가디언")
 }
 
-// 테슬라 모니터 하위 탭 정의
 enum class MonitorSubTab(val title: String) {
     VEHICLE("차량정보"),
     DRIVE("주행정보"),
@@ -16,36 +28,63 @@ enum class MonitorSubTab(val title: String) {
     BATTERY("배터리")
 }
 
-// 차량 현재 상태
+// ==========================================
+// 3. 차량 상태 데이터 모델
+// ==========================================
 data class VehicleState(
-    val statusText: String = "주차 중", // 수면 중, 주차 중, 주행 중 등
+    val vehicleName: String = "Model Y Long Range",
+    val statusText: String = "주차 중",
     val batteryPercent: Int = 82,
-    val totalOdometer: Double = 34520.0, // 총 주행거리 (km)
+    val estimatedRangeKm: Int = 412,
+    val totalOdometer: Double = 35240.0,
+    val isLocked: Boolean = true,
+    val isClimateOn: Boolean = false,
+    val insideTempC: Double = 21.5,
+    val outsideTempC: Double = 24.0,
+    val isTrunkOpen: Boolean = false,
+    val isFrunkOpen: Boolean = false,
+    val isSentryModeOn: Boolean = true,
+    val speedKmh: Int = 0,
+    val chargeStatus: String = "Discharging",
     val lastUpdated: Date = Date(),
-    val frontLeftTire: Double = 2.9, // bar
+    val frontLeftTire: Double = 2.9,
     val frontRightTire: Double = 2.9,
     val rearLeftTire: Double = 2.8,
     val rearRightTire: Double = 2.8
 )
 
-// 일지 아이템 (주행 또는 충전)
+// ==========================================
+// 4. 소모품 관리 모델
+// ==========================================
+data class ConsumableItem(
+    val name: String,
+    val currentKm: Int,
+    val maxKm: Int,
+    val lastReplacedDate: String
+) {
+    val progressRatio: Float
+        get() = (currentKm.toFloat() / maxKm.toFloat()).coerceIn(0f, 1f)
+}
+
+// ==========================================
+// 5. 주행 & 충전 일지 모델
+// ==========================================
 enum class JournalType { DRIVE, CHARGE }
 
 data class JournalLogItem(
-    val id: String,
-    val type: JournalType,
-    val dateText: String,
-    val timeText: String,
-    val distanceKm: Double,       // 주행거리 (1km 미만 제외)
-    val efficiencyWhKm: Int,      // 전비
-    val batteryStart: Int,
-    val batteryEnd: Int,
-    val addedBatteryPercent: Int, // 충전 시 증가한 배터리 %
-    val durationMinutes: Int,
-    val location: String
+    val id: String = "",
+    val type: JournalType = JournalType.DRIVE,
+    val dateText: String = "",
+    val timeText: String = "",
+    val distanceKm: Double = 0.0,
+    val efficiencyWhKm: Int = 0,
+    val batteryStart: Int = 0,
+    val batteryEnd: Int = 0,
+    val addedBatteryPercent: Int = 0,
+    val durationMinutes: Int = 0,
+    val location: String = ""
 )
 
-// 최근 운행일 전체 기록 요약
 data class DailyDriveSummary(
     val dateText: String = "최근 운행일",
     val totalDistanceKm: Double = 0.0,
@@ -54,28 +93,22 @@ data class DailyDriveSummary(
     val driveCount: Int = 0
 )
 
-// 월간 리포트
 data class MonthlyReport(
-    val monthYear: String, // 예: "2026년 7월"
-    val totalDistanceKm: Double,
-    val totalDriveMinutes: Int,
-    val avgEfficiencyWhKm: Int,
-    val totalChargePercent: Int,
-    val topDriveTimeDays: List<Pair<String, Int>>,   // 일자, 운전시간(분) Top 5
-    val topDriveDistanceDays: List<Pair<String, Double>> // 일자, 주행거리(km) Top 5
+    val monthYear: String = "",
+    val totalDistanceKm: Double = 0.0,
+    val totalDriveMinutes: Int = 0,
+    val avgEfficiencyWhKm: Int = 0,
+    val totalChargePercent: Int = 0,
+    val topDriveTimeDays: List<Pair<String, Int>> = emptyList(),
+    val topDriveDistanceDays: List<Pair<String, Double>> = emptyList()
 )
 
-// 배터리 열화 데이터 (최근 50개 레코드)
+// ==========================================
+// 6. 배터리 열화 데이터 모델
+// ==========================================
 data class BatteryRecord(
     val dateText: String,
     val batteryPercent: Int,
-    val calculated100Km: Double, // 100% 환산 주행가능거리
-    val degradationRate: Double  // 열화율 (%)
-)
-
-// 설정 정보
-data class AppSettings(
-    val supabaseUrl: String = "",
-    val supabaseKey: String = "",
-    val githubToken: String = ""
+    val calculated100Km: Double,
+    val degradationRate: Double
 )
