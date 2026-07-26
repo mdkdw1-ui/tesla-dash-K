@@ -20,7 +20,7 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Setup Gradle (캐싱으로 빌드 속도 대폭 향상)
+    - name: Setup Gradle (캐싱으로 빠른 빌드)
       uses: gradle/actions/setup-gradle@v3
 
     - name: Grant execute permission for gradlew
