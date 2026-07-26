@@ -21,6 +21,8 @@ class EncryptedSettingsManager(context: Context) {
         prefs.edit()
             .putString("KEY_SUPABASE_URL", settings.supabaseUrl)
             .putString("KEY_SUPABASE_KEY", settings.supabaseKey)
+            .putString("KEY_KAKAO_MAP_KEY", settings.kakaoMapKey)
+            .putString("KEY_TESLA_TOKEN", settings.teslaAccessToken)
             .putString("KEY_GITHUB_TOKEN", settings.githubToken)
             .apply()
     }
@@ -29,6 +31,8 @@ class EncryptedSettingsManager(context: Context) {
         return AppSettings(
             supabaseUrl = prefs.getString("KEY_SUPABASE_URL", "") ?: "",
             supabaseKey = prefs.getString("KEY_SUPABASE_KEY", "") ?: "",
+            kakaoMapKey = prefs.getString("KEY_KAKAO_MAP_KEY", "") ?: "",
+            teslaAccessToken = prefs.getString("KEY_TESLA_TOKEN", "") ?: "",
             githubToken = prefs.getString("KEY_GITHUB_TOKEN", "") ?: ""
         )
     }
