@@ -48,7 +48,11 @@ data class VehicleState(
     val sunRoofState: String? = null,
     val valetMode: Boolean? = null,
     val vehicleName: String? = null,
-    val sentryMode: Boolean? = null
+    val sentryMode: Boolean? = null,
+    val tpmsPressureFl: Double? = null,
+    val tpmsPressureFr: Double? = null,
+    val tpmsPressureRl: Double? = null,
+    val tpmsPressureRr: Double? = null
 )
 
 data class ChargeState(
@@ -86,9 +90,15 @@ data class VehicleSnapshot(
     val trunkOpen: Boolean = false,
     val speed: Double? = null,
     val odometer: Double? = null,
+    val insideTemp: Double? = null,
     val outsideTemp: Double? = null,
+    val isClimateOn: Boolean = false,
     val chargingState: String? = null,
     val shiftState: String? = null,
+    val tpmsFl: Double? = null,
+    val tpmsFr: Double? = null,
+    val tpmsRl: Double? = null,
+    val tpmsRr: Double? = null,
     val updatedAt: Long = 0L
 )
 

@@ -127,9 +127,15 @@ class AppRepository(
             trunkOpen = vehicleState?.isAnyTrunkOpen() == true,
             speed = driveState?.speed,
             odometer = vehicleState?.odometer,
-            outsideTemp = climateState?.outsideTemp,
-            chargingState = chargeState?.chargingState,
-            shiftState = driveState?.shiftState,
+            insideTemp = climateState?.insideTemp ?: 21.5,
+            outsideTemp = climateState?.outsideTemp ?: 18.0,
+            isClimateOn = climateState?.isClimateOn == true,
+            chargingState = chargeState?.chargingState ?: "Disconnected",
+            shiftState = driveState?.shiftState ?: "P",
+            tpmsFl = vehicleState?.tpmsPressureFl ?: 2.9,
+            tpmsFr = vehicleState?.tpmsPressureFr ?: 2.9,
+            tpmsRl = vehicleState?.tpmsPressureRl ?: 2.8,
+            tpmsRr = vehicleState?.tpmsPressureRr ?: 2.8,
             updatedAt = System.currentTimeMillis()
         )
     }
