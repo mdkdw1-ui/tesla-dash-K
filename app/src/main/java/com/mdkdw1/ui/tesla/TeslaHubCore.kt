@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 // ==========================================
-// 1. 데이터 모델 (Tesla Models)
+// 1. 데이터 모델 (Tesla Data Models)
 // ==========================================
 data class VehicleStateData(
     val statusText: String = "주차됨 (감시 중)",
@@ -37,7 +37,7 @@ data class AppConfig(
 )
 
 // ==========================================
-// 2. 보안 설정 저장소 (AES-256 EncryptedSharedPreferences)
+// 2. 보안 설정 저장소 (AES-256 하드웨어 암호화)
 // ==========================================
 class SecureSettingsManager(context: Context) {
     private val masterKey = MasterKey.Builder(context)
@@ -73,7 +73,7 @@ class SecureSettingsManager(context: Context) {
 }
 
 // ==========================================
-// 3. 비동기 테슬라 데이터 Repository
+// 3. 비동기 테슬라 및 보안 데이터 Repository
 // ==========================================
 class TeslaHubRepository {
     private val _vehicleData = MutableStateFlow(VehicleStateData())
@@ -107,11 +107,11 @@ class TeslaHubRepository {
     }
 
     fun triggerFrunk() {
-        // 프렁크 제어 명령
+        // 프렁크 열기 명령
     }
 
     fun triggerTrunk() {
-        // 트렁크 제어 명령
+        // 트렁크 열기 명령
     }
 
     fun triggerFlashLights() {
@@ -119,11 +119,9 @@ class TeslaHubRepository {
     }
 
     fun checkGuardianSecurityAlert(): String? {
-        val state = _vehicleData.value
-        return when {
-            state.isDoorOpen -> "⚠️ 경고: 문이 열려 있습니다!"
-            !state.isLocked -> "⚠️ 주의: 차량이 잠겨있지 않습니다."
-            else -> null
-        }
+        val current = _vehicleData.value
+        return if (!current.isLocked && current.isSentryOn) {
+            "⚠️ 경고: 감시 모드가 활성화되어 있으나 도어가 잠기지 않았습니다!"
+        } else null
     }
 }
