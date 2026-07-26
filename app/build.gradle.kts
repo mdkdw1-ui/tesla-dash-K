@@ -45,7 +45,7 @@ android {
     }
     packaging {
         resources {
-            excludes += "/META-IN/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
 }
@@ -63,7 +63,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
-    // 보안 암호화 SharedPreference
+    // 보안 암호화 SharedPreference (AES-256)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Supabase SDK & Serialization
@@ -71,7 +71,7 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:realtime-kt:2.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
 
-    // 코루틴 및 HTTP
+    // Coroutine & Ktor
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("io.ktor:ktor-client-android:2.3.7")
 }
