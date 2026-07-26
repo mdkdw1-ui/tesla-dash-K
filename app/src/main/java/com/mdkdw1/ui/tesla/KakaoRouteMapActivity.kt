@@ -32,7 +32,7 @@ class KakaoRouteMapActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        super.pause()
+        super.onPause()
         mapView.pause()
     }
 }
