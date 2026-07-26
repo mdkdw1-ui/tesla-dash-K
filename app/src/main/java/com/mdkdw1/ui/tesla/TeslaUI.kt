@@ -142,7 +142,6 @@ fun SettingsDialog(
     var supabaseUrl by remember { mutableStateOf(currentSettings.supabaseUrl) }
     var supabaseKey by remember { mutableStateOf(currentSettings.supabaseKey) }
     var kakaoMapKey by remember { mutableStateOf(currentSettings.kakaoMapKey) }
-    var isAutoSync by remember { mutableStateOf(currentSettings.isAutoSync) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -172,7 +171,7 @@ fun SettingsDialog(
         },
         confirmButton = {
             Button(onClick = {
-                onSave(AppSettings(supabaseUrl, supabaseKey, kakaoMapKey, isAutoSync))
+                onSave(AppSettings(supabaseUrl = supabaseUrl, supabaseKey = supabaseKey, kakaoMapKey = kakaoMapKey))
             }) {
                 Text("저장")
             }
