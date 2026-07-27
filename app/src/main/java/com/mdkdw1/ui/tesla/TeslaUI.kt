@@ -295,7 +295,7 @@ fun VehicleInfoTabContent(
             }
         }
 
-        // [6] 운행기록일지 (1km 미만 제외)
+        // [6] 운행기록일지
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -511,6 +511,8 @@ fun SettingsDialog(
     var supabaseKey by remember { mutableStateOf(currentSettings.supabaseKey) }
     var kakaoMapKey by remember { mutableStateOf(currentSettings.kakaoMapKey) }
     var githubKey by remember { mutableStateOf(currentSettings.githubKey) }
+    var teslaAccessToken by remember { mutableStateOf(currentSettings.teslaAccessToken) }
+    var githubToken by remember { mutableStateOf(currentSettings.githubToken) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -554,7 +556,18 @@ fun SettingsDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    onSave(AppSettings(supabaseUrl, supabaseKey, kakaoMapKey, githubKey, currentSettings.isAutoSync))
+                    // 명시적 인자 이름(Named Arguments)을 지정하여 Type Mismatch 방지
+                    onSave(
+                        AppSettings(
+                            supabaseUrl = supabaseUrl,
+                            supabaseKey = supabaseKey,
+                            kakaoMapKey = kakaoMapKey,
+                            githubKey = githubKey,
+                            teslaAccessToken = teslaAccessToken,
+                            githubToken = githubToken,
+                            isAutoSync = currentSettings.isAutoSync
+                        )
+                    )
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
             ) {
