@@ -1,4 +1,4 @@
-package com.mdkdw1/ui/tesla
+package com.mdkdw1.ui.tesla
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -11,97 +11,68 @@ import kotlinx.coroutines.launch
 class TeslaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val settingsManager = EncryptedSettingsManager(application)
-    private val repository = TeslaRepository()
-
-    private val _settings = MutableStateFlow(AppSettings())
-    val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+    private val repository = TeslaRepository(settingsManager)
 
     private val _vehicleState = MutableStateFlow(VehicleState())
     val vehicleState: StateFlow<VehicleState> = _vehicleState.asStateFlow()
 
-    private val _batteryDegradation = MutableStateFlow<List<DegradationRecord>>(emptyList())
-    val batteryDegradation: StateFlow<List<DegradationRecord>> = _batteryDegradation.asStateFlow()
+    private val _degradationList = MutableStateFlow<List<DegradationRecord>>(emptyList())
+    val degradationList: StateFlow<List<DegradationRecord>> = _degradationList.asStateFlow()
 
-    private val _chargingHistory = MutableStateFlow<List<ChargeRecord>>(emptyList())
-    val chargingHistory: StateFlow<List<ChargeRecord>> = _chargingHistory.asStateFlow()
+    private val _chargeRecords = MutableStateFlow<List<ChargeRecord>>(emptyList())
+    val chargeRecords: StateFlow<List<ChargeRecord>> = _chargeRecords.asStateFlow()
 
     private val _consumables = MutableStateFlow<List<ConsumableItem>>(emptyList())
     val consumables: StateFlow<List<ConsumableItem>> = _consumables.asStateFlow()
 
-    private val _isRefreshing = MutableStateFlow(false)
-    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+    private val _appSettings = MutableStateFlow(AppSettings())
+    val appSettings: StateFlow<AppSettings> = _appSettings.asStateFlow()
+
+    private val _currentMainTab = MutableStateFlow(0)
+    val currentMainTab: StateFlow<Int> = _currentMainTab.asStateFlow()
 
     init {
-        loadSettings()
-        refreshAllData()
+        loadData()
     }
 
-    fun loadSettings() {
-        val loaded = settingsManager.loadSettings()
-        _settings.value = loaded
+    fun loadData() {
+        viewModelScope.launch {
+            _appSettings.value = repository.loadAppSettings()
+            _vehicleState.value = repository.getVehicleState()
+            _degradationList.value = repository.getDegradationHistory()
+            _chargeRecords.value = repository.getChargeRecords()
+            _consumables.value = repository.getConsumableItems()
+        }
+    }
+
+    fun setMainTab(index: Int) {
+        _currentMainTab.value = index
     }
 
     fun saveSettings(newSettings: AppSettings) {
-        settingsManager.saveSettings(newSettings)
-        _settings.value = newSettings
-        refreshAllData()
-    }
-
-    fun refreshAllData() {
         viewModelScope.launch {
-            _isRefreshing.value = true
-            try {
-                _vehicleState.value = repository.fetchVehicleState(_settings.value)
-                _batteryDegradation.value = repository.fetchBatteryDegradation()
-                _chargingHistory.value = repository.fetchChargingHistory()
-                _consumables.value = repository.fetchConsumables()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                _isRefreshing.value = false
-            }
+            repository.saveAppSettings(newSettings)
+            _appSettings.value = newSettings
         }
     }
 
-    fun toggleDoorLock() {
-        viewModelScope.launch {
-            _vehicleState.value = repository.toggleDoorLock(_vehicleState.value)
-        }
+    fun toggleLock() {
+        _vehicleState.value = _vehicleState.value.copy(locked = !_vehicleState.value.locked)
     }
 
     fun toggleClimate() {
-        viewModelScope.launch {
-            _vehicleState.value = repository.toggleClimate(_vehicleState.value)
-        }
+        _vehicleState.value = _vehicleState.value.copy(climateOn = !_vehicleState.value.climateOn)
     }
 
     fun toggleSentry() {
-        viewModelScope.launch {
-            _vehicleState.value = repository.toggleSentry(_vehicleState.value)
-        }
-    }
-
-    fun toggleTrunk() {
-        viewModelScope.launch {
-            _vehicleState.value = repository.toggleTrunk(_vehicleState.value)
-        }
+        _vehicleState.value = _vehicleState.value.copy(sentryMode = !_vehicleState.value.sentryMode)
     }
 
     fun toggleFrunk() {
-        viewModelScope.launch {
-            _vehicleState.value = repository.toggleFrunk(_vehicleState.value)
-        }
+        _vehicleState.value = _vehicleState.value.copy(frunkOpen = !_vehicleState.value.frunkOpen)
     }
 
-    fun addChargeRecord(record: ChargeRecord) {
-        viewModelScope.launch {
-            _chargingHistory.value = repository.addChargeRecord(record)
-        }
-    }
-
-    fun updateConsumable(item: ConsumableItem) {
-        viewModelScope.launch {
-            _consumables.value = repository.updateConsumable(item)
-        }
+    fun toggleTrunk() {
+        _vehicleState.value = _vehicleState.value.copy(trunkOpen = !_vehicleState.value.trunkOpen)
     }
 }

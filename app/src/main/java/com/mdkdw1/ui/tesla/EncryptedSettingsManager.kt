@@ -1,7 +1,6 @@
-package com.mdkdw1/ui/tesla
+package com.mdkdw1.ui.tesla
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
@@ -11,37 +10,36 @@ class EncryptedSettingsManager(context: Context) {
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
         .build()
 
-    private val sharedPreferences: SharedPreferences = EncryptedSharedPreferences.create(
+    private val prefs = EncryptedSharedPreferences.create(
         context,
-        "encrypted_tesla_settings",
+        "tesla_dash_encrypted_prefs",
         masterKey,
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SKEY,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
     fun saveSettings(settings: AppSettings) {
-        sharedPreferences.edit()
-            .putString("supabase_url", settings.supabaseUrl)
-            .putString("supabase_key", settings.supabaseKey)
-            .putString("kakao_key", settings.kakaoKey)
-            .putString("tesla_token", settings.teslaToken)
-            .putString("vehicle_id", settings.vehicleId)
-            .putString("github_key", settings.githubKey)
-            .apply()
+        prefs.edit().apply {
+            putString("supabase_url", settings.supabaseUrl)
+            putString("supabase_key", settings.supabaseKey)
+            putString("kakao_key", settings.kakaoKey)
+            putString("tesla_token", settings.teslaToken)
+            putString("vehicle_id", settings.vehicleId)
+            apply()
+        }
     }
 
     fun loadSettings(): AppSettings {
         return AppSettings(
-            supabaseUrl = sharedPreferences.getString("supabase_url", "") ?: "",
-            supabaseKey = sharedPreferences.getString("supabase_key", "") ?: "",
-            kakaoKey = sharedPreferences.getString("kakao_key", "") ?: "",
-            teslaToken = sharedPreferences.getString("tesla_token", "") ?: "",
-            vehicleId = sharedPreferences.getString("vehicle_id", "") ?: "",
-            githubKey = sharedPreferences.getString("github_key", "") ?: ""
+            supabaseUrl = prefs.getString("supabase_url", "") ?: "",
+            supabaseKey = prefs.getString("supabase_key", "") ?: "",
+            kakaoKey = prefs.getString("kakao_key", "") ?: "",
+            teslaToken = prefs.getString("tesla_token", "") ?: "",
+            vehicleId = prefs.getString("vehicle_id", "") ?: ""
         )
     }
 
-    fun clearSettings() {
-        sharedPreferences.edit().clear().apply()
+    fun clear() {
+        prefs.edit().clear().apply()
     }
 }
