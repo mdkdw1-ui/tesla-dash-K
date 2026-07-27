@@ -1,127 +1,109 @@
 package com.mdkdw1.ui.tesla
 
-/**
- * Tesla Dash K - 데이터 모델 통합 정의
- */
-
-// 1. 차량 상태 (Vehicle State) 데이터 클래스
-data class VehicleState(
-    val vehicleName: String = "Tesla Model Y",
-    val batteryPercent: Int = 78,
-    val range: Double = 345.0,
-    val estimatedRangeKm: Double = 320.0,
-    val totalOdometer: Double = 24500.0,
-    val cabinTemp: Double = 21.5,
-    val insideTempC: Double = 21.5,
-    val outsideTempC: Double = 18.0,
-    val isClimateOn: Boolean = false,
-    val chargeStatus: String = "Disconnected",
-    val isTrunkOpen: Boolean = false,
-    val isFrunkOpen: Boolean = false,
-    val isSentryModeOn: Boolean = true,
-    val speedKmh: Double = 0.0,
-    val tpmsFrontLeft: Double = 2.9,
-    val tpmsFrontRight: Double = 2.9,
-    val tpmsRearLeft: Double = 2.8,
-    val tpmsRearRight: Double = 2.8,
-    val isLocked: Boolean = true,
-    val isSteeringHeaterOn: Boolean = false,
-    val seatHeaterDriver: Int = 0,
-    val seatHeaterPassenger: Int = 0,
-    val parkedTimeMinutes: Long = 120,
-    val guardianAlertsCount: Int = 3,
-    val latitude: Double = 37.5665,
-    val longitude: Double = 126.9780,
-    val locationName: String = "서울특별시 중구 세종대로 110"
-) {
-    // 기존 UI 및 View Model과의 하위 호환성을 위한 프로퍼티 별칭 (Getter)
-    val carName: String get() = vehicleName
-    val batteryLevel: Int get() = batteryPercent
-    val ratedRange: Double get() = range
-    val estRange: Double get() = estimatedRangeKm
-    val odometer: Double get() = totalOdometer
-    val climateOn: Boolean get() = isClimateOn
-    val sentryMode: Boolean get() = isSentryModeOn
-    val chargeState: String get() = chargeStatus
-    val frontLeftPsi: Double get() = tpmsFrontLeft
-    val frontRightPsi: Double get() = tpmsFrontRight
-    val rearLeftPsi: Double get() = tpmsRearLeft
-    val rearRightPsi: Double get() = tpmsRearRight
-}
-
-// 2. 주행 / 충전 / 주차 일지 Enum 및 데이터 클래스
-enum class JournalType {
-    DRIVE,
-    CHARGE,
-    PARK
-}
-
-data class JournalLogItem(
-    val id: String = "",
-    val timestamp: String = "",
-    val type: JournalType = JournalType.DRIVE,
-    val title: String = "",
-    val startSoc: Int = 0,
-    val endSoc: Int = 0,
-    val distanceKm: Double = 0.0,
-    val energyUsedKwh: Double = 0.0,
-    val efficiencyWhKm: Double = 0.0,
-    val costWon: Int = 0,
-    val location: String = ""
-) {
-    val date: String get() = timestamp
-    val typeName: String
-        get() = when (type) {
-            JournalType.DRIVE -> "주행"
-            JournalType.CHARGE -> "충전"
-            JournalType.PARK -> "주차"
-        }
-}
-
-// 3. 배터리 열화 및 100% 환산 주행거리 기록 데이터 클래스
-data class BatteryRecord(
-    val id: String = "",
-    val date: String = "",
-    val degradationPercent: Double = 0.0,
-    val maxRange100PercentKm: Double = 0.0,
-    val fullCapacityKwh: Double = 0.0
-) {
-    val degradation: Double get() = degradationPercent
-    val range100: Double get() = maxRange100PercentKm
-    val capacity: Double get() = fullCapacityKwh
-}
-
-// 4. 소모품 관리 데이터 클래스
-data class ConsumableItem(
-    val id: String = "",
-    val name: String = "",
-    val lastReplacedKm: Int = 0,
-    val replacementIntervalKm: Int = 10000,
-    val currentOdometer: Int = 24500,
-    val lastReplacedDate: String = ""
-) {
-    val progressPercent: Float
-        get() {
-            val driven = currentOdometer - lastReplacedKm
-            if (replacementIntervalKm <= 0) return 0f
-            return (driven.toFloat() / replacementIntervalKm.toFloat()).coerceIn(0f, 1f)
-        }
-
-    val remainingKm: Int
-        get() = (replacementIntervalKm - (currentOdometer - lastReplacedKm)).coerceAtLeast(0)
-}
-
-// 5. 보안 저장소 및 앱 설정 데이터 클래스
+// 앱 암호화 설정 모델
 data class AppSettings(
     val supabaseUrl: String = "",
     val supabaseKey: String = "",
     val kakaoMapKey: String = "",
-    val teslaAccessToken: String = "",
-    val teslaRefreshToken: String = "",
-    val autoRefreshIntervalSec: Int = 30
+    val teslaClientId: String = "",
+    val teslaClientSecret: String = "",
+    val githubKey: String = "",
+    val githubToken: String = "",
+    val isAutoSync: Boolean = true
 )
 
-// 프로젝트 내 다양한 모델 명칭 대응을 위한 TypeAlias
-typealias DriveLog = JournalLogItem
-typealias BatteryHealth = BatteryRecord
-typealias Consumable = ConsumableItem
+// 차량 상태 정보 모델
+data class VehicleState(
+    val vehicleName: String = "Model Y",
+    val batteryLevel: Int = 80,
+    val estimatedRange: Double = 380.0,
+    val maxRange: Double = 475.0,
+    val isCharging: Boolean = false,
+    val chargeLimit: Int = 80,
+    val chargeCurrent: Int = 32,
+    val isLocked: Boolean = true,
+    val climateOn: Boolean = false,
+    val insideTemp: Double = 21.5,
+    val outsideTemp: Double = 18.0,
+    val targetTemp: Double = 20.0,
+    val sentryModeOn: Boolean = false,
+    val trunkOpen: Boolean = false,
+    val frunkOpen: Boolean = false,
+    val flTire: Double = 42.0,
+    val frTire: Double = 41.5,
+    val rlTire: Double = 42.0,
+    val rrTire: Double = 42.5,
+    val statusText: String = "주차됨",
+    val lastUpdatedTimestamp: String = "방금 전"
+)
+
+// 주행 기록 아이템
+data class DriveLogItem(
+    val id: String = "",
+    val date: String = "",
+    val distanceKm: Double = 0.0,
+    val durationMinutes: Int = 0,
+    val energyUsedKwh: Double = 0.0,
+    val startLocation: String = "",
+    val endLocation: String = "",
+    val avgEfficiencyWhPerKm: Double = 0.0
+)
+
+// 월간 주행/전비 보고서
+data class MonthlyReport(
+    val month: String = "",
+    val totalDistanceKm: Double = 0.0,
+    val totalEnergyKwh: Double = 0.0,
+    val totalCostKrw: Int = 0,
+    val avgEfficiency: Double = 0.0
+)
+
+// 배터리 열화율 데이터 아이템
+data class BatteryDegradationItem(
+    val date: String = "",
+    val odometerKm: Double = 0.0,
+    val maxCapacityKwh: Double = 0.0,
+    val degradationPercent: Double = 0.0,
+    val estimated100PercentRange: Double = 0.0
+)
+
+// 감시 모드(Sentry) 이벤트 아이템
+data class SentryEventItem(
+    val id: String = "",
+    val timestamp: String = "",
+    val location: String = "",
+    val cameraAngle: String = "",
+    val videoUrl: String = ""
+)
+
+// 소모품 관리 아이템
+data class ConsumableItem(
+    val id: String = "",
+    val name: String = "",
+    val lastReplacedDate: String = "",
+    val lastReplacedKm: Double = 0.0,
+    val replacementIntervalKm: Double = 0.0,
+    val replacementIntervalMonths: Int = 0,
+    val currentUsagePercent: Double = 0.0
+)
+
+// 일지 유형 및 아이템
+enum class JournalType {
+    DRIVE, CHARGE, MAINTENANCE, SENTRY
+}
+
+data class JournalLogItem(
+    val id: String = "",
+    val type: JournalType = JournalType.DRIVE,
+    val date: String = "",
+    val title: String = "",
+    val description: String = "",
+    val cost: Int = 0
+)
+
+// 배터리 이력
+data class BatteryRecord(
+    val date: String = "",
+    val degradationPercent: Double = 0.0,
+    val range100PercentKm: Double = 0.0
+)

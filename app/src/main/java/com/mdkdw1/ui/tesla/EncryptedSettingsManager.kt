@@ -10,35 +10,40 @@ class EncryptedSettingsManager(context: Context) {
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
         .build()
 
-    private val prefs = EncryptedSharedPreferences.create(
+    private val sharedPreferences = EncryptedSharedPreferences.create(
         context,
-        "tesla_secure_prefs",
+        "tesla_encrypted_settings",
         masterKey,
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    fun loadSettings(): AppSettings {
+    fun getSettings(): AppSettings {
         return AppSettings(
-            supabaseUrl = prefs.getString("supabase_url", "") ?: "",
-            supabaseKey = prefs.getString("supabase_key", "") ?: "",
-            kakaoMapKey = prefs.getString("kakao_map_key", "") ?: "",
-            githubKey = prefs.getString("github_key", "") ?: "",
-            teslaAccessToken = prefs.getString("tesla_access_token", "") ?: "",
-            githubToken = prefs.getString("github_token", "") ?: "",
-            isAutoSync = prefs.getBoolean("is_auto_sync", true)
+            supabaseUrl = sharedPreferences.getString("supabase_url", "") ?: "",
+            supabaseKey = sharedPreferences.getString("supabase_key", "") ?: "",
+            kakaoMapKey = sharedPreferences.getString("kakao_map_key", "") ?: "",
+            teslaClientId = sharedPreferences.getString("tesla_client_id", "") ?: "",
+            teslaClientSecret = sharedPreferences.getString("tesla_client_secret", "") ?: "",
+            githubKey = sharedPreferences.getString("github_key", "") ?: "",
+            githubToken = sharedPreferences.getString("github_token", "") ?: "",
+            isAutoSync = sharedPreferences.getBoolean("is_auto_sync", true)
         )
     }
 
+    fun loadSettings(): AppSettings = getSettings()
+
     fun saveSettings(settings: AppSettings) {
-        prefs.edit()
-            .putString("supabase_url", settings.supabaseUrl)
-            .putString("supabase_key", settings.supabaseKey)
-            .putString("kakao_map_key", settings.kakaoMapKey)
-            .putString("github_key", settings.githubKey)
-            .putString("tesla_access_token", settings.teslaAccessToken)
-            .putString("github_token", settings.githubToken)
-            .putBoolean("is_auto_sync", settings.isAutoSync)
-            .apply()
+        sharedPreferences.edit().apply {
+            putString("supabase_url", settings.supabaseUrl)
+            putString("supabase_key", settings.supabaseKey)
+            putString("kakao_map_key", settings.kakaoMapKey)
+            putString("tesla_client_id", settings.teslaClientId)
+            putString("tesla_client_secret", settings.teslaClientSecret)
+            putString("github_key", settings.githubKey)
+            putString("github_token", settings.githubToken)
+            putBoolean("is_auto_sync", settings.isAutoSync)
+            apply()
+        }
     }
 }
