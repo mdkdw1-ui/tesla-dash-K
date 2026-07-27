@@ -2,70 +2,62 @@ package com.mdkdw1.ui.tesla
 
 data class AppSettings(
     val supabaseUrl: String = "",
-    val supabaseAnonKey: String = "",
-    val kakaoMapKey: String = "",
-    val teslaRefreshToken: String = "",
-    val aesPassword: String = "",
-    val targetSoc: Int = 80,
-    val chargeAmps: Int = 32,
-    val updateIntervalSec: Int = 30,
-    val autoRefresh: Boolean = true,
-    val pushNotification: Boolean = true
+    val supabaseKey: String = "",
+    val kakaoKey: String = "",
+    val teslaToken: String = "",
+    val vehicleId: String = ""
 )
 
 data class VehicleState(
-    val vehicleName: String = "Model Y Long Range",
+    val isOnline: Boolean = true,
     val batteryLevel: Int = 78,
-    val batteryRangeKm: Double = 412.5,
+    val estimatedRangeKm: Int = 385,
+    val extrapolated100RangeKm: Int = 493,
+    val chargeLimit: Int = 80,
     val isCharging: Boolean = false,
-    val chargeState: String = "충전 대기",
+    val isChargePortOpen: Boolean = false,
+    val insideTemp: Float = 21.5f,
+    val outsideTemp: Float = 18.0f,
+    val targetTemp: Float = 21.0f,
+    val speedKmh: Int = 0,
     val isLocked: Boolean = true,
-    val climateOn: Boolean = false,
-    val insideTempC: Double = 21.5,
-    val outsideTempC: Double = 18.0,
-    val sentryMode: Boolean = true,
-    val trunkOpen: Boolean = false,
-    val frunkOpen: Boolean = false,
-    val speedKm: Double = 0.0,
-    val odometerKm: Double = 34520.0,
-    val tirePressureFl: Double = 2.9,
-    val tirePressureFr: Double = 2.9,
-    val tirePressureRl: Double = 2.9,
-    val tirePressureRr: Double = 2.9,
-    val lastUpdated: String = "방금 전"
+    val isClimateOn: Boolean = false,
+    val isSentryOn: Boolean = true,
+    val latitude: Double = 37.5665,
+    val longitude: Double = 126.9780,
+    val odometerKm: Double = 15420.0
 )
 
-data class DegradationRecord(
-    val id: String = "",
-    val date: String,
-    val odometerKm: Double,
-    val fullRangeKm: Double,
-    val degradationPct: Double
+data class BatteryDegradationData(
+    val date: String = "",
+    val mileage: Int = 0,
+    val degradationRate: Float = 0f,
+    val estimatedMaxRangeKm: Int = 0
 )
 
-data class ChargeRecord(
+data class ChargingSession(
     val id: String = "",
-    val date: String,
-    val location: String,
-    val addedKwh: Double,
-    val costKrw: Int,
-    val durationMinutes: Int,
-    val chargeType: String
+    val date: String = "",
+    val location: String = "",
+    val startPercent: Int = 0,
+    val endPercent: Int = 0,
+    val energyAddedKwh: Double = 0.0,
+    val cost: Int = 0,
+    val remainingPercent: Int = 0
 )
 
 data class ConsumableItem(
-    val id: String,
-    val name: String,
-    val iconName: String,
-    val lastReplacedDate: String,
-    val lastReplacedOdoKm: Double,
-    val replacementIntervalKm: Double,
-    val currentOdoKm: Double
+    val id: String = "",
+    val name: String = "",
+    val lastReplacedKm: Int = 0,
+    val replacementIntervalKm: Int = 10000,
+    val currentMileageKm: Int = 0
 ) {
-    val remainingPct: Int
-        get() {
-            val driven = currentOdoKm - lastReplacedOdoKm
-            val remain = replacementIntervalKm - driven
-            return ((remain / replacementIntervalKm) * 100).toInt().coerceIn(0, 100)
-        }
+    val remainingKm: Int
+        get() = (lastReplacedKm + replacementIntervalKm) - currentMileageKm
+
+    val remainingPercent: Float
+        get() = if (replacementIntervalKm > 0) {
+            ((remainingKm.toFloat() / replacementIntervalKm.toFloat()) * 100f).coerceIn(0f, 100f)
+        } else 0f
 }
