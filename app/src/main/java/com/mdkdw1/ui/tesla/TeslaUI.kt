@@ -1,5 +1,6 @@
 package com.mdkdw1.ui.tesla
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -35,11 +36,11 @@ fun TeslaMainScreen(viewModel: TeslaViewModel) {
     var isSyncing by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
 
-    val vehicleState = viewModel.vehicleState
-    val settings = viewModel.settings
-    val driveLogs = viewModel.driveLogs
-    val monthlyReport = viewModel.monthlyReport
-    val batteryList = viewModel.batteryList
+    val vehicleState by viewModel.vehicleState.collectAsState()
+    val settings by viewModel.settings.collectAsState()
+    val driveLogs by viewModel.driveLogs.collectAsState()
+    val monthlyReport by viewModel.monthlyReport.collectAsState()
+    val batteryList by viewModel.batteryList.collectAsState()
 
     val lastDriveLog = driveLogs.firstOrNull { !it.isCharging }
 
@@ -84,6 +85,7 @@ fun TeslaMainScreen(viewModel: TeslaViewModel) {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            // [상단 메인 탭] 테슬라 모니터 / 감시 가디언
             TabRow(
                 selectedTabIndex = mainTabState,
                 containerColor = DarkCard,
@@ -103,6 +105,7 @@ fun TeslaMainScreen(viewModel: TeslaViewModel) {
             }
 
             if (mainTabState == 0) {
+                // [서브 탭] 차량정보 / 주행정보 / 월간리포트 / 배터리
                 ScrollableTabRow(
                     selectedTabIndex = subTabState,
                     containerColor = DarkCard,
@@ -171,7 +174,7 @@ fun VehicleInfoTabContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // [1] 상단 차량상태
+        // [1] 상단 차량상태 Card
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -193,7 +196,7 @@ fun VehicleInfoTabContent(
             }
         }
 
-        // [2] 원격 제어
+        // [2] 원격 제어 버튼 Card
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -229,7 +232,7 @@ fun VehicleInfoTabContent(
             }
         }
 
-        // [3] 주차 시간
+        // [3] 주차 시간 Card
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -252,7 +255,7 @@ fun VehicleInfoTabContent(
             }
         }
 
-        // [4] 최근 운행일 전체기록
+        // [4] 최근 운행 요약 Card
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -274,7 +277,7 @@ fun VehicleInfoTabContent(
             }
         }
 
-        // [5] 타이어 공기압 (PSI)
+        // [5] 타이어 공기압 Card (4륜 PSI)
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -295,7 +298,7 @@ fun VehicleInfoTabContent(
             }
         }
 
-        // [6] 운행기록일지
+        // [6] 운행 기록 일지 Card
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -329,7 +332,9 @@ fun DriveInfoTabContent(driveLogs: List<DriveLogItem>) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = DarkCard),
                 shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth().border(1.dp, DarkBorder, RoundedCornerShape(8.dp))
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, DarkBorder, RoundedCornerShape(8.dp))
             ) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(log.date, color = TextSecondary, fontSize = 12.sp)
@@ -556,7 +561,6 @@ fun SettingsDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    // 명시적 인자 이름(Named Arguments)을 지정하여 Type Mismatch 방지
                     onSave(
                         AppSettings(
                             supabaseUrl = supabaseUrl,
