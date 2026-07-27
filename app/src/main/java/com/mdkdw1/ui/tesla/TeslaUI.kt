@@ -18,6 +18,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+// index-2.html 다크 모드 컬러 팔레트
 val DarkBackground = Color(0xFF0D0E12)
 val DarkCard = Color(0xFF161820)
 val DarkBorder = Color(0xFF262936)
@@ -49,7 +50,7 @@ fun TeslaMainScreen(viewModel: TeslaViewModel) {
             TopAppBar(
                 title = {
                     Text(
-                        "Tesla Command Hub",
+                        text = "Tesla Command Hub",
                         color = TextPrimary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
@@ -62,14 +63,14 @@ fun TeslaMainScreen(viewModel: TeslaViewModel) {
                         isSyncing = false
                     }) {
                         Icon(
-                            Icons.Default.Refresh,
+                            imageVector = Icons.Default.Refresh,
                             contentDescription = "데이터 동기화",
                             tint = if (isSyncing) AccentAmber else TextPrimary
                         )
                     }
                     IconButton(onClick = { showSettingsDialog = true }) {
                         Icon(
-                            Icons.Default.Settings,
+                            imageVector = Icons.Default.Settings,
                             contentDescription = "설정",
                             tint = TextPrimary
                         )
@@ -85,7 +86,7 @@ fun TeslaMainScreen(viewModel: TeslaViewModel) {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // [상단 메인 탭] 테슬라 모니터 / 감시 가디언
+            // [최상단 메인 탭] 테슬라 모니터 | 감시 가디언
             TabRow(
                 selectedTabIndex = mainTabState,
                 containerColor = DarkCard,
@@ -95,17 +96,31 @@ fun TeslaMainScreen(viewModel: TeslaViewModel) {
                 Tab(
                     selected = mainTabState == 0,
                     onClick = { mainTabState = 0 },
-                    text = { Text("테슬라 모니터", fontWeight = FontWeight.Bold) }
+                    text = {
+                        Text(
+                            text = "테슬라 모니터",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = if (mainTabState == 0) AccentAmber else TextSecondary
+                        )
+                    }
                 )
                 Tab(
                     selected = mainTabState == 1,
                     onClick = { mainTabState = 1 },
-                    text = { Text("감시 가디언", fontWeight = FontWeight.Bold) }
+                    text = {
+                        Text(
+                            text = "감시 가디언",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = if (mainTabState == 1) AccentAmber else TextSecondary
+                        )
+                    }
                 )
             }
 
             if (mainTabState == 0) {
-                // [서브 탭] 차량정보 / 주행정보 / 월간리포트 / 배터리
+                // [서브 탭] 차량정보 | 주행정보 | 월간리포트 | 배터리
                 ScrollableTabRow(
                     selectedTabIndex = subTabState,
                     containerColor = DarkCard,
@@ -118,7 +133,14 @@ fun TeslaMainScreen(viewModel: TeslaViewModel) {
                         Tab(
                             selected = subTabState == index,
                             onClick = { subTabState = index },
-                            text = { Text(title, fontSize = 14.sp) }
+                            text = {
+                                Text(
+                                    text = title,
+                                    fontSize = 14.sp,
+                                    color = if (subTabState == index) AccentBlue else TextSecondary,
+                                    fontWeight = if (subTabState == index) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
                         )
                     }
                 }
@@ -174,7 +196,7 @@ fun VehicleInfoTabContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // [1] 상단 차량상태 Card
+        // [1] 차량 상태 요약 카드
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -182,8 +204,8 @@ fun VehicleInfoTabContent(
                 .fillMaxWidth()
                 .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
         ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("차량 상태 요약", color = TextSecondary, fontSize = 14.sp)
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("차량 상태 요약", color = TextSecondary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -196,7 +218,7 @@ fun VehicleInfoTabContent(
             }
         }
 
-        // [2] 원격 제어 버튼 Card
+        // [2] 원격 제어 버튼 카드
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -209,30 +231,33 @@ fun VehicleInfoTabContent(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = { viewModel.toggleLock() },
-                        colors = ButtonDefaults.buttonColors(containerColor = if (vehicleState.isLocked) AccentBlue else Color.DarkGray),
-                        modifier = Modifier.weight(1f)
+                        colors = ButtonDefaults.buttonColors(containerColor = if (vehicleState.isLocked) AccentBlue else Color(0xFF374151)),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text(if (vehicleState.isLocked) "잠김 해제" else "잠금")
+                        Text(if (vehicleState.isLocked) "잠김 해제" else "잠금", fontSize = 13.sp)
                     }
                     Button(
                         onClick = { viewModel.toggleClimate() },
-                        colors = ButtonDefaults.buttonColors(containerColor = if (vehicleState.climateOn) AccentAmber else Color.DarkGray),
-                        modifier = Modifier.weight(1f)
+                        colors = ButtonDefaults.buttonColors(containerColor = if (vehicleState.climateOn) AccentAmber else Color(0xFF374151)),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text(if (vehicleState.climateOn) "공조 끄기" else "공조 켜기")
+                        Text(if (vehicleState.climateOn) "공조 끄기" else "공조 켜기", fontSize = 13.sp)
                     }
                     Button(
                         onClick = { viewModel.toggleCharging() },
-                        colors = ButtonDefaults.buttonColors(containerColor = if (vehicleState.isCharging) Color.Red else Color.DarkGray),
-                        modifier = Modifier.weight(1f)
+                        colors = ButtonDefaults.buttonColors(containerColor = if (vehicleState.isCharging) Color(0xFFEF4444) else Color(0xFF374151)),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text(if (vehicleState.isCharging) "충전 중지" else "충전 시작")
+                        Text(if (vehicleState.isCharging) "충전 중지" else "충전 시작", fontSize = 13.sp)
                     }
                 }
             }
         }
 
-        // [3] 주차 시간 Card
+        // [3] 주차 시간 카드
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -255,7 +280,7 @@ fun VehicleInfoTabContent(
             }
         }
 
-        // [4] 최근 운행 요약 Card
+        // [4] 최근 운행 요약 카드
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -277,7 +302,7 @@ fun VehicleInfoTabContent(
             }
         }
 
-        // [5] 타이어 공기압 Card (4륜 PSI)
+        // [5] 타이어 공기압 카드 (FL, FR, RL, RR)
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -298,7 +323,7 @@ fun VehicleInfoTabContent(
             }
         }
 
-        // [6] 운행 기록 일지 Card
+        // [6] 운행 기록 일지 목록
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkCard),
             shape = RoundedCornerShape(12.dp),
@@ -461,8 +486,17 @@ fun BatteryTabContent(batteryList: List<BatteryDegradationItem>) {
 
 @Composable
 fun GuardianTabContent() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("감시 가디언 모니터링 모드 동작 중", color = TextSecondary, fontSize = 16.sp)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DarkBackground),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(Icons.Default.Security, contentDescription = null, tint = AccentAmber, modifier = Modifier.size(48.dp))
+            Text("감시 가디언 모니터링 모드 동작 중", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("실시간 차량 보안 및 이벤트 데이터를 감지합니다.", color = TextSecondary, fontSize = 12.sp)
+        }
     }
 }
 
@@ -551,7 +585,7 @@ fun SettingsDialog(
                 OutlinedTextField(
                     value = githubKey,
                     onValueChange = { githubKey = it },
-                    label = { Text("GitHub Key (sync.js 갱신용)") },
+                    label = { Text("GitHub Key") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue)
