@@ -1,17 +1,18 @@
 package com.mdkdw1.ui.tesla
 
 import android.annotation.SuppressLint
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,150 +30,141 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 
+// 테마 색상 정의 (index-2.html 다크모드 대응)
 val DarkBackground = Color(0xFF0D0E12)
 val DarkCard = Color(0xFF161820)
 val DarkBorder = Color(0xFF262936)
 val TextPrimary = Color(0xFFF3F4F6)
-val TextSecondary = Color(0xFF9CA3AF)
 val AccentAmber = Color(0xFFD97706)
 val AccentBlue = Color(0xFF3B82F6)
 val AccentGreen = Color(0xFF10B981)
 val AccentRed = Color(0xFFEF4444)
-val AccentPurple = Color(0xFF818CF8)
+val AccentPurple = Color(0xFF8B5CF6)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TeslaMainScreen(viewModel: TeslaViewModel) {
     val vehicleState by viewModel.vehicleState.collectAsState()
-    val settings by viewModel.settings.collectAsState()
-    val currentTab by viewModel.currentMainTab.collectAsState()
+    val appSettings by viewModel.appSettings.collectAsState()
+    val chargingHistory by viewModel.chargingHistory.collectAsState()
+    val batteryDegradation by viewModel.batteryDegradation.collectAsState()
+    val consumables by viewModel.consumables.collectAsState()
+
+    var selectedTabIndex by remember { mutableStateOf(0) }
+    val tabs = listOf("대시보드", "배터리&주행거리", "충전&소모품", "위치&지도", "설정")
 
     Scaffold(
         topBar = {
-            HeaderBar(
-                vehicleName = vehicleState.vehicleName,
-                lastUpdated = vehicleState.lastUpdated,
-                onRefresh = { viewModel.refreshState() }
-            )
-        },
-        bottomBar = {
-            BottomNavBar(
-                selectedTab = currentTab,
-                onTabSelected = { viewModel.selectTab(it) }
+            TopAppBar(
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DirectionsCar,
+                            contentDescription = null,
+                            tint = AccentBlue
+                        )
+                        Text(
+                            text = "Tesla Command Hub",
+                            color = TextPrimary,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.refreshData() }) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "새로고침",
+                            tint = AccentBlue
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = DarkCard
+                )
             )
         },
         containerColor = DarkBackground
-    ) { innerPadding ->
-        Box(
+    ) { paddingValues ->
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(paddingValues)
         ) {
-            when (currentTab) {
-                0 -> DashboardScreen(vehicleState = vehicleState, viewModel = viewModel)
-                1 -> BatteryDegradationScreen(viewModel = viewModel)
-                2 -> ChargingHistoryScreen(viewModel = viewModel)
-                3 -> ConsumableManagementScreen(viewModel = viewModel)
-                4 -> KakaoMapScreen(settings = settings)
-                5 -> SettingsScreen(settings = settings, viewModel = viewModel)
+            // 상단 탭 메인 메뉴
+            ScrollableTabRow(
+                selectedTabIndex = selectedTabIndex,
+                containerColor = DarkCard,
+                contentColor = AccentBlue,
+                edgePadding = 12.dp
+            ) {
+                tabs.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTabIndex == index,
+                        onClick = { selectedTabIndex = index },
+                        text = {
+                            Text(
+                                text = title,
+                                color = if (selectedTabIndex == index) AccentBlue else Color.Gray,
+                                fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    )
+                }
+            }
+
+            // 탭 변경에 따른 본문 콘텐츠
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(DarkBackground)
+            ) {
+                when (selectedTabIndex) {
+                    0 -> DashboardTab(
+                        vehicleState = vehicleState,
+                        viewModel = viewModel
+                    )
+                    1 -> BatteryRangeTab(
+                        vehicleState = vehicleState,
+                        degradationList = batteryDegradation
+                    )
+                    2 -> ChargingConsumablesTab(
+                        chargingList = chargingHistory,
+                        consumablesList = consumables
+                    )
+                    3 -> LocationMapTab(
+                        vehicleState = vehicleState,
+                        settings = appSettings
+                    )
+                    4 -> SettingsTab(
+                        settings = appSettings,
+                        onSave = { updatedSettings ->
+                            viewModel.saveSettings(updatedSettings)
+                        },
+                        onClear = {
+                            viewModel.clearSettings()
+                        }
+                    )
+                }
             }
         }
     }
 }
 
+// -----------------------------------------------------------------------------
+// 1. 대시보드 탭 (DashboardTab)
+// -----------------------------------------------------------------------------
 @Composable
-fun HeaderBar(
-    vehicleName: String,
-    lastUpdated: String,
-    onRefresh: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(DarkCard)
-            .border(BorderStroke(1.dp, DarkBorder))
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Default.DirectionsCar,
-                contentDescription = "Tesla",
-                tint = AccentAmber,
-                modifier = Modifier.size(28.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column {
-                Text(
-                    text = vehicleName,
-                    color = TextPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "동기화: $lastUpdated",
-                    color = TextSecondary,
-                    fontSize = 12.sp
-                )
-            }
-        }
-        IconButton(onClick = onRefresh) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = "Refresh",
-                tint = AccentBlue
-            )
-        }
-    }
-}
-
-@Composable
-fun BottomNavBar(
-    selectedTab: Int,
-    onTabSelected: (Int) -> Unit
-) {
-    val items = listOf(
-        NavItem("대시보드", Icons.Default.Dashboard),
-        NavItem("배터리/열화", Icons.Default.BatteryChargingFull),
-        NavItem("충전 기록", Icons.Default.EvStation),
-        NavItem("소모품", Icons.Default.Build),
-        NavItem("위치 지도", Icons.Default.Map),
-        NavItem("설정", Icons.Default.Settings)
-    )
-
-    NavigationBar(
-        containerColor = DarkCard,
-        contentColor = TextPrimary,
-        tonalElevation = 8.dp
-    ) {
-        items.forEachIndexed { index, item ->
-            NavigationBarItem(
-                selected = selectedTab == index,
-                onClick = { onTabSelected(index) },
-                icon = { Icon(item.icon, contentDescription = item.label) },
-                label = { Text(item.label, fontSize = 10.sp) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = AccentAmber,
-                    selectedTextColor = AccentAmber,
-                    unselectedIconColor = TextSecondary,
-                    unselectedTextColor = TextSecondary,
-                    indicatorColor = DarkBorder
-                )
-            )
-        }
-    }
-}
-
-data class NavItem(val label: String, val icon: ImageVector)
-
-@Composable
-fun DashboardScreen(
+fun DashboardTab(
     vehicleState: VehicleState,
     viewModel: TeslaViewModel
 ) {
@@ -185,58 +177,52 @@ fun DashboardScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // 차량 상태 바
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = DarkCard),
-            border = BorderStroke(1.dp, AccentAmber)
+            border = BorderStroke(1.dp, DarkBorder),
+            shape = RoundedCornerShape(16.dp)
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("배터리 잔량", color = TextSecondary, fontSize = 14.sp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
                     Text(
-                        text = vehicleState.chargeState,
-                        color = if (vehicleState.isCharging) AccentGreen else AccentBlue,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "${vehicleState.batteryLevel}%",
+                        text = vehicleState.vehicleName,
                         color = TextPrimary,
-                        fontSize = 38.sp,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "예상 주행거리: ${vehicleState.batteryRangeKm} km",
-                        color = TextSecondary,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(bottom = 6.dp)
+                        text = if (vehicleState.isOnline) "온라인 (연결됨)" else "오프라인 (절전 모드)",
+                        color = if (vehicleState.isOnline) AccentGreen else AccentRed,
+                        fontSize = 12.sp
                     )
                 }
-                Spacer(modifier = Modifier.height(12.dp))
-                LinearProgressIndicator(
-                    progress = vehicleState.batteryLevel / 100f,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(5.dp)),
-                    color = if (vehicleState.batteryLevel > 20) AccentGreen else AccentRed,
-                    trackColor = DarkBorder
-                )
+                Surface(
+                    color = if (vehicleState.isLocked) DarkBorder else AccentAmber.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, if (vehicleState.isLocked) DarkBorder else AccentAmber)
+                ) {
+                    Text(
+                        text = if (vehicleState.isLocked) "잠김" else "잠금 해제됨",
+                        color = if (vehicleState.isLocked) Color.Gray else AccentAmber,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
 
+        // 빠른 제어 버튼 격자
         Text(
-            text = "빠른 제어 명령",
+            text = "원격 제어",
             color = TextPrimary,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold
@@ -246,23 +232,29 @@ fun DashboardScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            ControlCard(
-                title = "도어 잠금",
-                subtitle = if (vehicleState.isLocked) "잠김" else "열림",
-                icon = if (vehicleState.isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+            ControlTile(
+                title = if (vehicleState.isLocked) "잠금 해제" else "도어 잠금",
+                icon = if (vehicleState.isLocked) Icons.Default.LockOpen else Icons.Default.Lock,
                 isActive = vehicleState.isLocked,
-                activeColor = AccentGreen,
+                activeColor = AccentBlue,
                 modifier = Modifier.weight(1f),
-                onClick = { viewModel.toggleLock() }
+                onClick = { viewModel.toggleDoorLock() }
             )
-            ControlCard(
-                title = "실내 공조",
-                subtitle = if (vehicleState.climateOn) "${vehicleState.insideTempC}°C 작동중" else "꺼짐",
+            ControlTile(
+                title = "공조 " + if (vehicleState.isClimateOn) "켜짐" else "꺼짐",
                 icon = Icons.Default.AcUnit,
-                isActive = vehicleState.climateOn,
+                isActive = vehicleState.isClimateOn,
                 activeColor = AccentBlue,
                 modifier = Modifier.weight(1f),
                 onClick = { viewModel.toggleClimate() }
+            )
+            ControlTile(
+                title = "센트리 " + if (vehicleState.isSentryOn) "켜짐" else "꺼짐",
+                icon = Icons.Default.Security,
+                isActive = vehicleState.isSentryOn,
+                activeColor = AccentRed,
+                modifier = Modifier.weight(1f),
+                onClick = { viewModel.toggleSentryMode() }
             )
         }
 
@@ -270,34 +262,117 @@ fun DashboardScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            ControlCard(
-                title = "센트리 모드",
-                subtitle = if (vehicleState.sentryMode) "감시 중" else "비활성",
-                icon = Icons.Default.Security,
-                isActive = vehicleState.sentryMode,
-                activeColor = AccentAmber,
+            ControlTile(
+                title = "트렁크 열기",
+                icon = Icons.Default.DirectionsCar,
+                isActive = false,
+                activeColor = DarkBorder,
                 modifier = Modifier.weight(1f),
-                onClick = { viewModel.toggleSentry() }
+                onClick = { viewModel.openTrunk() }
             )
-            ControlCard(
-                title = "트렁크 / 프렁크",
-                subtitle = "트렁크: ${if (vehicleState.trunkOpen) "열림" else "닫힘"}",
-                icon = Icons.Default.SensorDoor,
-                isActive = vehicleState.trunkOpen || vehicleState.frunkOpen,
-                activeColor = AccentPurple,
+            ControlTile(
+                title = "프렁크 열기",
+                icon = Icons.Default.MinorCrash,
+                isActive = false,
+                activeColor = DarkBorder,
                 modifier = Modifier.weight(1f),
-                onClick = { viewModel.toggleTrunk() }
+                onClick = { viewModel.openFrunk() }
+            )
+            ControlTile(
+                title = "충전구 열기",
+                icon = Icons.Default.EvStation,
+                isActive = vehicleState.isChargePortOpen,
+                activeColor = AccentGreen,
+                modifier = Modifier.weight(1f),
+                onClick = { viewModel.toggleChargePort() }
             )
         }
 
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ControlTile(
+                title = "전조등 점멸",
+                icon = Icons.Default.Lightbulb,
+                isActive = false,
+                activeColor = DarkBorder,
+                modifier = Modifier.weight(1f),
+                onClick = { viewModel.flashLights() }
+            )
+            ControlTile(
+                title = "경적 울리기",
+                icon = Icons.Default.VolumeUp,
+                isActive = false,
+                activeColor = DarkBorder,
+                modifier = Modifier.weight(1f),
+                onClick = { viewModel.honkHorn() }
+            )
+            Spacer(modifier = Modifier.weight(1f))
+        }
+
+        // 주요 실시간 메트릭 카드
+        Text(
+            text = "차량 상태 모니터링",
+            color = TextPrimary,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            MetricCard(
+                title = "배터리 잔량",
+                value = "${vehicleState.batteryLevel}%",
+                subtext = if (vehicleState.isCharging) "충전 중 (${vehicleState.chargeLimit}% 제한)" else "대기 중",
+                icon = Icons.Default.BatteryChargingFull,
+                accentColor = AccentGreen,
+                modifier = Modifier.weight(1f)
+            )
+            MetricCard(
+                title = "예상 주행거리",
+                value = "${vehicleState.estimatedRangeKm} km",
+                subtext = "100% 환산: ${vehicleState.extrapolated100RangeKm} km",
+                icon = Icons.Default.Speed,
+                accentColor = AccentBlue,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            MetricCard(
+                title = "실내/실외 온도",
+                value = "${vehicleState.insideTemp}°C / ${vehicleState.outsideTemp}°C",
+                subtext = "목표 온도: ${vehicleState.targetTemp}°C",
+                icon = Icons.Default.Thermostat,
+                accentColor = AccentAmber,
+                modifier = Modifier.weight(1f)
+            )
+            MetricCard(
+                title = "누적 주행거리",
+                value = "${vehicleState.odometerKm} km",
+                subtext = "속도: ${vehicleState.speedKmh} km/h",
+                icon = Icons.Default.Navigation,
+                accentColor = AccentPurple,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        // 공조 설정 제어 카드
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = DarkCard),
-            border = BorderStroke(1.dp, DarkBorder)
+            border = BorderStroke(1.dp, DarkBorder),
+            shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "차량 상태 정보",
+                    text = "실내 온도 설정",
                     color = TextPrimary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
@@ -305,35 +380,625 @@ fun DashboardScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    StatusDetailItem("총 누적 주행", "${vehicleState.odometerKm} km")
-                    StatusDetailItem("실내 온도", "${vehicleState.insideTempC} °C")
-                    StatusDetailItem("외기 온도", "${vehicleState.outsideTempC} °C")
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                Divider(color = DarkBorder)
-                Spacer(modifier = Modifier.height(12.dp))
-                Text("타이어 공기압 (bar)", color = TextSecondary, fontSize = 12.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround
-                ) {
-                    Text("전좌: ${vehicleState.tirePressureFl}", color = TextPrimary, fontSize = 13.sp)
-                    Text("전우: ${vehicleState.tirePressureFr}", color = TextPrimary, fontSize = 13.sp)
-                    Text("후좌: ${vehicleState.tirePressureRl}", color = TextPrimary, fontSize = 13.sp)
-                    Text("후우: ${vehicleState.tirePressureRr}", color = TextPrimary, fontSize = 13.sp)
+                    IconButton(
+                        onClick = { viewModel.adjustTargetTemp(-0.5f) },
+                        modifier = Modifier
+                            .background(DarkBorder, CircleShape)
+                            .size(40.dp)
+                    ) {
+                        Icon(Icons.Default.Remove, contentDescription = "온도 감축", tint = TextPrimary)
+                    }
+
+                    Text(
+                        text = "${vehicleState.targetTemp} °C",
+                        color = TextPrimary,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    IconButton(
+                        onClick = { viewModel.adjustTargetTemp(0.5f) },
+                        modifier = Modifier
+                            .background(DarkBorder, CircleShape)
+                            .size(40.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "온도 증가", tint = TextPrimary)
+                    }
                 }
             }
         }
     }
 }
 
+// -----------------------------------------------------------------------------
+// 2. 배터리 & 주행거리 탭 (BatteryRangeTab)
+// -----------------------------------------------------------------------------
 @Composable
-fun ControlCard(
+fun BatteryRangeTab(
+    vehicleState: VehicleState,
+    degradationList: List<BatteryDegradationData>
+) {
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = DarkCard),
+            border = BorderStroke(1.dp, DarkBorder),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "배터리 건강 상태 (SoH)",
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "${100.0f - vehicleState.degradationRate}%",
+                        color = AccentGreen,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "(열화율: ${vehicleState.degradationRate}%)",
+                        color = Color.Gray,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
+            }
+        }
+
+        // 배터리 열화 트렌드 커스텀 차트
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = DarkCard),
+            border = BorderStroke(1.dp, DarkBorder),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "배터리 열화율 히스토리 (%)",
+                    color = TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                DegradationChart(
+                    data = degradationList,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun DegradationChart(
+    data: List<BatteryDegradationData>,
+    modifier: Modifier = Modifier
+) {
+    if (data.isEmpty()) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Text("데이터가 없습니다.", color = Color.Gray)
+        }
+        return
+    }
+
+    Canvas(modifier = modifier) {
+        val width = size.width
+        val height = size.height
+        val maxDeg = (data.maxOfOrNull { it.degradationPercent } ?: 5.0f).coerceAtLeast(5.0f)
+        val minDeg = 0.0f
+
+        val points = data.mapIndexed { index, item ->
+            val x = (index.toFloat() / (data.size - 1).coerceAtLeast(1)) * width
+            val y = height - ((item.degradationPercent - minDeg) / (maxDeg - minDeg)) * height
+            Offset(x, y)
+        }
+
+        // 가이드 라인 그리기
+        drawLine(
+            color = DarkBorder,
+            start = Offset(0f, height / 2),
+            end = Offset(width, height / 2),
+            strokeWidth = 1.dp.toPx()
+        )
+
+        // 라인 경로 생성
+        val path = Path().apply {
+            if (points.isNotEmpty()) {
+                moveTo(points.first().x, points.first().y)
+                for (i in 1 until points.size) {
+                    lineTo(points[i].x, points[i].y)
+                }
+            }
+        }
+
+        drawPath(
+            path = path,
+            color = AccentPurple,
+            style = Stroke(width = 3.dp.toPx())
+        )
+
+        // 포인트 원 그리기
+        points.forEach { point ->
+            drawCircle(
+                color = AccentAmber,
+                radius = 4.dp.toPx(),
+                center = point
+            )
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// 3. 충전 & 소모품 탭 (ChargingConsumablesTab)
+// -----------------------------------------------------------------------------
+@Composable
+fun ChargingConsumablesTab(
+    chargingList: List<ChargingSession>,
+    consumablesList: List<ConsumableItem>
+) {
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // 소모품 관리 섹션
+        Text(
+            text = "소모품 교체주기 관리",
+            color = TextPrimary,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        consumablesList.forEach { consumable ->
+            ConsumableProgressCard(consumable)
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // 최근 충전 히스토리
+        Text(
+            text = "최근 충전 기록",
+            color = TextPrimary,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        chargingList.forEach { session ->
+            ChargingSessionItem(session)
+        }
+    }
+}
+
+@Composable
+fun ConsumableProgressCard(item: ConsumableItem) {
+    val progress = (item.remainingPercent / 100.0f).coerceIn(0.0f, 1.0f)
+    val progressColor = when {
+        progress > 0.6f -> AccentGreen
+        progress > 0.3f -> AccentAmber
+        else -> AccentRed
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = DarkCard),
+        border = BorderStroke(1.dp, DarkBorder),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(text = item.name, color = TextPrimary, fontWeight = FontWeight.Bold)
+                Text(text = "${item.remainingPercent}% 남음", color = progressColor, fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = progress,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = progressColor,
+                trackColor = DarkBorder
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "최종 교체: ${item.lastReplacedDate} | 추천 교체 주기: ${item.replacementIntervalKm} km",
+                color = Color.Gray,
+                fontSize = 11.sp
+            )
+        }
+    }
+}
+
+@Composable
+fun ChargingSessionItem(session: ChargingSession) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = DarkCard),
+        border = BorderStroke(1.dp, DarkBorder),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(text = session.locationName, color = TextPrimary, fontWeight = FontWeight.Bold)
+                Text(text = session.date, color = Color.Gray, fontSize = 12.sp)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(text = "+${session.chargedKwh} kWh", color = AccentGreen, fontWeight = FontWeight.Bold)
+                Text(text = "₩${session.costAmount}", color = TextPrimary, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// 4. 위치 & 지도 탭 (LocationMapTab - 카카오맵 WebView 연동)
+// -----------------------------------------------------------------------------
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun LocationMapTab(
+    vehicleState: VehicleState,
+    settings: AppSettings
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = DarkCard),
+            border = BorderStroke(1.dp, DarkBorder),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "차량 실시간 위치 (Kakao Map)",
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "위도: ${vehicleState.latitude} | 경도: ${vehicleState.longitude}",
+                    color = Color.Gray,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (settings.kakaoKey.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(380.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
+                    ) {
+                        AndroidView(
+                            factory = { ctx ->
+                                WebView(ctx).apply {
+                                    webViewClient = WebViewClient()
+                                    webChromeClient = WebChromeClient()
+
+                                    // 핵심 수정: outer scope `settings` 가림 방지를 위해 `this.settings` 명시적 사용
+                                    this.settings.javaScriptEnabled = true
+                                    this.settings.domStorageEnabled = true
+                                    this.settings.databaseEnabled = true
+                                    this.settings.useWideViewPort = true
+                                    this.settings.loadWithOverviewMode = true
+
+                                    val mapHtml = """
+                                        <!DOCTYPE html>
+                                        <html>
+                                        <head>
+                                            <meta charset="utf-8"/>
+                                            <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+                                            <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=${settings.kakaoKey}"></script>
+                                            <style>
+                                                html, body, #map { width: 100%; height: 100%; margin: 0; padding: 0; background: #0D0E12; }
+                                            </style>
+                                        </head>
+                                        <body>
+                                            <div id="map"></div>
+                                            <script>
+                                                var container = document.getElementById('map');
+                                                var options = {
+                                                    center: new kakao.maps.LatLng(${vehicleState.latitude}, ${vehicleState.longitude}),
+                                                    level: 3
+                                                };
+                                                var map = new kakao.maps.Map(container, options);
+                                                var markerPosition = new kakao.maps.LatLng(${vehicleState.latitude}, ${vehicleState.longitude}); 
+                                                var marker = new kakao.maps.Marker({
+                                                    position: markerPosition
+                                                });
+                                                marker.setMap(map);
+                                            </script>
+                                        </body>
+                                        </html>
+                                    """.trimIndent()
+
+                                    loadDataWithBaseURL(
+                                        "https://dapi.kakao.com",
+                                        mapHtml,
+                                        "text/html",
+                                        "UTF-8",
+                                        null
+                                    )
+                                }
+                            },
+                            update = { webView ->
+                                val updatedHtml = """
+                                    <!DOCTYPE html>
+                                    <html>
+                                    <head>
+                                        <meta charset="utf-8"/>
+                                        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+                                        <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=${settings.kakaoKey}"></script>
+                                        <style>
+                                            html, body, #map { width: 100%; height: 100%; margin: 0; padding: 0; background: #0D0E12; }
+                                        </style>
+                                    </head>
+                                    <body>
+                                        <div id="map"></div>
+                                        <script>
+                                            var container = document.getElementById('map');
+                                            var options = {
+                                                center: new kakao.maps.LatLng(${vehicleState.latitude}, ${vehicleState.longitude}),
+                                                level: 3
+                                            };
+                                            var map = new kakao.maps.Map(container, options);
+                                            var markerPosition = new kakao.maps.LatLng(${vehicleState.latitude}, ${vehicleState.longitude}); 
+                                            var marker = new kakao.maps.Marker({
+                                                position: markerPosition
+                                            });
+                                            marker.setMap(map);
+                                        </script>
+                                    </body>
+                                    </html>
+                                """.trimIndent()
+
+                                webView.loadDataWithBaseURL(
+                                    "https://dapi.kakao.com",
+                                    updatedHtml,
+                                    "text/html",
+                                    "UTF-8",
+                                    null
+                                )
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .background(DarkBackground, RoundedCornerShape(12.dp))
+                            .border(1.dp, DarkBorder, RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "설정 탭에서 Kakao Map JavaScript API Key를 설정해 주세요.",
+                            color = Color.Gray,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// 5. 설정 탭 (SettingsTab)
+// -----------------------------------------------------------------------------
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsTab(
+    settings: AppSettings,
+    onSave: (AppSettings) -> Unit,
+    onClear: () -> Unit
+) {
+    var supabaseUrl by remember(settings) { mutableStateOf(settings.supabaseUrl) }
+    var supabaseKey by remember(settings) { mutableStateOf(settings.supabaseKey) }
+    var kakaoKey by remember(settings) { mutableStateOf(settings.kakaoKey) }
+    var teslaToken by remember(settings) { mutableStateOf(settings.teslaToken) }
+    var vehicleId by remember(settings) { mutableStateOf(settings.vehicleId) }
+
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = DarkCard),
+            border = BorderStroke(1.dp, DarkBorder),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "API & 암호화 서비스 설정",
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                OutlinedTextField(
+                    value = supabaseUrl,
+                    onValueChange = { supabaseUrl = it },
+                    label = { Text("Supabase URL") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccentBlue,
+                        unfocusedBorderColor = DarkBorder,
+                        focusedLabelColor = AccentBlue,
+                        unfocusedLabelColor = Color.Gray,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = supabaseKey,
+                    onValueChange = { supabaseKey = it },
+                    label = { Text("Supabase Anon Key") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccentBlue,
+                        unfocusedBorderColor = DarkBorder,
+                        focusedLabelColor = AccentBlue,
+                        unfocusedLabelColor = Color.Gray,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = kakaoKey,
+                    onValueChange = { kakaoKey = it },
+                    label = { Text("Kakao Map JavaScript Key") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccentBlue,
+                        unfocusedBorderColor = DarkBorder,
+                        focusedLabelColor = AccentBlue,
+                        unfocusedLabelColor = Color.Gray,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = teslaToken,
+                    onValueChange = { teslaToken = it },
+                    label = { Text("Tesla Refresh Token") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccentBlue,
+                        unfocusedBorderColor = DarkBorder,
+                        focusedLabelColor = AccentBlue,
+                        unfocusedLabelColor = Color.Gray,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = vehicleId,
+                    onValueChange = { vehicleId = it },
+                    label = { Text("Vehicle ID") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccentBlue,
+                        unfocusedBorderColor = DarkBorder,
+                        focusedLabelColor = AccentBlue,
+                        unfocusedLabelColor = Color.Gray,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            onSave(
+                                AppSettings(
+                                    supabaseUrl = supabaseUrl,
+                                    supabaseKey = supabaseKey,
+                                    kakaoKey = kakaoKey,
+                                    teslaToken = teslaToken,
+                                    vehicleId = vehicleId
+                                )
+                            )
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("설정 저장 (AES-256 암호화)", color = Color.White)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            onClear()
+                            supabaseUrl = ""
+                            supabaseKey = ""
+                            kakaoKey = ""
+                            teslaToken = ""
+                            vehicleId = ""
+                        },
+                        border = BorderStroke(1.dp, AccentRed),
+                        modifier = Modifier.weight(0.6f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("초기화", color = AccentRed)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// 공통 재사용 UI 컴포넌트
+// -----------------------------------------------------------------------------
+@Composable
+fun ControlTile(
     title: String,
-    subtitle: String,
     icon: ImageVector,
     isActive: Boolean,
     activeColor: Color,
@@ -341,714 +1006,67 @@ fun ControlCard(
     onClick: () -> Unit
 ) {
     Card(
-        modifier = modifier.clickable { onClick() },
+        modifier = modifier
+            .height(80.dp)
+            .clickable { onClick() },
         colors = CardDefaults.cardColors(
             containerColor = if (isActive) activeColor.copy(alpha = 0.15f) else DarkCard
         ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (isActive) activeColor else DarkBorder
-        )
+        border = BorderStroke(1.dp, if (isActive) activeColor else DarkBorder),
+        shape = RoundedCornerShape(12.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.Start
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = title,
-                tint = if (isActive) activeColor else TextSecondary,
-                modifier = Modifier.size(26.dp)
+                tint = if (isActive) activeColor else Color.Gray,
+                modifier = Modifier.size(24.dp)
             )
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = title,
-                color = TextPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = subtitle,
-                color = if (isActive) activeColor else TextSecondary,
-                fontSize = 12.sp
+                color = if (isActive) activeColor else TextPrimary,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center,
+                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
             )
         }
     }
 }
 
 @Composable
-fun StatusDetailItem(title: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(title, color = TextSecondary, fontSize = 12.sp)
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(value, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-fun BatteryDegradationScreen(viewModel: TeslaViewModel) {
-    val records by viewModel.degradationRecords.collectAsState()
-    val scrollState = rememberScrollState()
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = "배터리 열화율 분석",
-            color = TextPrimary,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        val latestDeg = records.lastOrNull()?.degradationPct ?: 0.0
-        val latestRange = records.lastOrNull()?.fullRangeKm ?: 0.0
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = DarkCard),
-            border = BorderStroke(1.dp, DarkBorder)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                horizontalArrangement = Arrangement.SpaceAround
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("현재 열화율", color = TextSecondary, fontSize = 12.sp)
-                    Text(
-                        text = "$latestDeg %",
-                        color = AccentPurple,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Divider(
-                    modifier = Modifier
-                        .height(40.dp)
-                        .width(1.dp),
-                    color = DarkBorder
-                )
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("100% 환산 거리", color = TextSecondary, fontSize = 12.sp)
-                    Text(
-                        text = "$latestRange km",
-                        color = AccentGreen,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = DarkCard),
-            border = BorderStroke(1.dp, DarkBorder)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "누적 열화율 추이 (%)",
-                    color = TextPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                DegradationChart(records = records)
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = DarkCard),
-            border = BorderStroke(1.dp, DarkBorder)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "측정 히스토리",
-                    color = TextPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                records.forEach { rec ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(rec.date, color = TextSecondary, fontSize = 13.sp)
-                        Text("${rec.odometerKm.toInt()} km", color = TextPrimary, fontSize = 13.sp)
-                        Text("${rec.fullRangeKm} km", color = AccentGreen, fontSize = 13.sp)
-                        Text("${rec.degradationPct}%", color = AccentPurple, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Divider(color = DarkBorder)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun DegradationChart(records: List<DegradationRecord>) {
-    if (records.isEmpty()) return
-
-    val maxPct = (records.maxOfOrNull { it.degradationPct } ?: 5.0).coerceAtLeast(5.0)
-
-    Canvas(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(160.dp)
-            .padding(8.dp)
-    ) {
-        val width = size.width
-        val height = size.height
-        val stepX = width / (records.size - 1).coerceAtLeast(1)
-
-        val path = Path()
-        records.forEachIndexed { index, rec ->
-            val x = index * stepX
-            val y = height - (rec.degradationPct / maxPct * height).toFloat()
-            if (index == 0) {
-                path.moveTo(x, y)
-            } else {
-                path.lineTo(x, y)
-            }
-            drawCircle(
-                color = AccentPurple,
-                radius = 5f,
-                center = Offset(x, y)
-            )
-        }
-
-        drawPath(
-            path = path,
-            color = AccentPurple,
-            style = Stroke(width = 3f)
-        )
-    }
-}
-
-@Composable
-fun ChargingHistoryScreen(viewModel: TeslaViewModel) {
-    val records by viewModel.chargeRecords.collectAsState()
-    var showAddDialog by remember { mutableStateOf(false) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "충전 기록 및 비용 관리",
-                color = TextPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Button(
-                onClick = { showAddDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = AccentAmber)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "추가", modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("기록 추가", fontSize = 12.sp)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        val totalKwh = records.sumOf { it.addedKwh }
-        val totalCost = records.sumOf { it.costKrw }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = DarkCard),
-            border = BorderStroke(1.dp, DarkBorder)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceAround
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("총 충전량", color = TextSecondary, fontSize = 12.sp)
-                    Text("${String.format("%.1f", totalKwh)} kWh", color = AccentBlue, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("총 지출 비용", color = TextSecondary, fontSize = 12.sp)
-                    Text("${String.format("%,d", totalCost)} 원", color = AccentAmber, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(records) { rec ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = DarkCard),
-                    border = BorderStroke(1.dp, DarkBorder)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(rec.location, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("${rec.date} • ${rec.chargeType} (${rec.durationMinutes}분)", color = TextSecondary, fontSize = 12.sp)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text("${rec.addedKwh} kWh", color = AccentGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("${String.format("%,d", rec.costKrw)} 원", color = AccentAmber, fontSize = 13.sp)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (showAddDialog) {
-        AddChargeDialog(
-            onDismiss = { showAddDialog = false },
-            onAdd = { date, loc, kwh, cost, dur, type ->
-                viewModel.addChargeRecord(date, loc, kwh, cost, dur, type)
-                showAddDialog = false
-            }
-        )
-    }
-}
-
-@Composable
-fun AddChargeDialog(
-    onDismiss: () -> Unit,
-    onAdd: (String, String, Double, Int, Int, String) -> Unit
+fun MetricCard(
+    title: String,
+    value: String,
+    subtext: String,
+    icon: ImageVector,
+    accentColor: Color,
+    modifier: Modifier = Modifier
 ) {
-    var date by remember { mutableStateOf("2024-12-25") }
-    var location by remember { mutableStateOf("") }
-    var kwh by remember { mutableStateOf("") }
-    var cost by remember { mutableStateOf("") }
-    var duration by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf("Supercharger") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = DarkCard,
-        title = { Text("충전 기록 추가", color = TextPrimary) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = location,
-                    onValueChange = { location = it },
-                    label = { Text("충전소 위치") },
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = kwh,
-                    onValueChange = { kwh = it },
-                    label = { Text("충전량 (kWh)") },
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = cost,
-                    onValueChange = { cost = it },
-                    label = { Text("비용 (원)") },
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = duration,
-                    onValueChange = { duration = it },
-                    label = { Text("소요 시간 (분)") },
-                    singleLine = true
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onAdd(
-                        date,
-                        location.ifBlank { "자택 충전" },
-                        kwh.toDoubleOrNull() ?: 0.0,
-                        cost.toIntOrNull() ?: 0,
-                        duration.toIntOrNull() ?: 0,
-                        type
-                    )
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = AccentAmber)
-            ) {
-                Text("저장")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("취소", color = TextSecondary)
-            }
-        }
-    )
-}
-
-@Composable
-fun ConsumableManagementScreen(viewModel: TeslaViewModel) {
-    val items by viewModel.consumableItems.collectAsState()
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = DarkCard),
+        border = BorderStroke(1.dp, DarkBorder),
+        shape = RoundedCornerShape(16.dp)
     ) {
-        Text(
-            text = "소모품 교환 및 상태 관리",
-            color = TextPrimary,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(items) { item ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = DarkCard),
-                    border = BorderStroke(1.dp, DarkBorder)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(item.name, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Text(
-                                text = "남은 수명 ${item.remainingPct}%",
-                                color = if (item.remainingPct > 30) AccentGreen else AccentRed,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        LinearProgressIndicator(
-                            progress = item.remainingPct / 100f,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(8.dp)
-                                .clip(RoundedCornerShape(4.dp)),
-                            color = if (item.remainingPct > 30) AccentGreen else AccentRed,
-                            trackColor = DarkBorder
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "최근 교환: ${item.lastReplacedDate} (${item.lastReplacedOdoKm.toInt()} km)",
-                                color = TextSecondary,
-                                fontSize = 11.sp
-                            )
-                            Button(
-                                onClick = { viewModel.resetConsumableItem(item.id) },
-                                colors = ButtonDefaults.buttonColors(containerColor = DarkBorder),
-                                modifier = Modifier.height(32.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                            ) {
-                                Text("교환 완료 등록", fontSize = 11.sp, color = TextPrimary)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@SuppressLint("SetJavaScriptEnabled")
-@Composable
-fun KakaoMapScreen(settings: AppSettings) {
-    val apiKey = settings.kakaoMapKey
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = "차량 실시간 위치 (카카오맵)",
-            color = TextPrimary,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(16.dp)
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .border(BorderStroke(1.dp, DarkBorder))
-        ) {
-            if (apiKey.isBlank()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(DarkCard),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "설정 메뉴에서 Kakao Map API 키를 입력해주세요.",
-                        color = TextSecondary,
-                        fontSize = 14.sp
-                    )
-                }
-            } else {
-                AndroidView(
-                    factory = { context ->
-                        WebView(context).apply {
-                            webViewClient = WebViewClient()
-                            settings.javaScriptEnabled = true
-                            val html = """
-                                <!DOCTYPE html>
-                                <html>
-                                <head>
-                                    <meta charset="utf-8"/>
-                                    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=$apiKey"></script>
-                                    <style>
-                                        html, body, #map { width:100%; height:100%; margin:0; padding:0; background-color:#0d0e12; }
-                                    </style>
-                                </head>
-                                <body>
-                                <div id="map"></div>
-                                <script>
-                                    var container = document.getElementById('map');
-                                    var options = {
-                                        center: new kakao.maps.LatLng(37.5665, 126.9780),
-                                        level: 3
-                                    };
-                                    var map = new kakao.maps.Map(container, options);
-                                    var markerPosition  = new kakao.maps.LatLng(37.5665, 126.9780); 
-                                    var marker = new kakao.maps.Marker({
-                                        position: markerPosition
-                                    });
-                                    marker.setMap(map);
-                                </script>
-                                </body>
-                                </html>
-                            """.trimIndent()
-                            loadDataWithBaseURL("https://dapi.kakao.com", html, "text/html", "UTF-8", null)
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun SettingsScreen(
-    settings: AppSettings,
-    viewModel: TeslaViewModel
-) {
-    val scrollState = rememberScrollState()
-
-    var supabaseUrl by remember(settings) { mutableStateOf(settings.supabaseUrl) }
-    var supabaseAnonKey by remember(settings) { mutableStateOf(settings.supabaseAnonKey) }
-    var kakaoMapKey by remember(settings) { mutableStateOf(settings.kakaoMapKey) }
-    var teslaRefreshToken by remember(settings) { mutableStateOf(settings.teslaRefreshToken) }
-    var aesPassword by remember(settings) { mutableStateOf(settings.aesPassword) }
-    var targetSoc by remember(settings) { mutableStateOf(settings.targetSoc.toString()) }
-    var chargeAmps by remember(settings) { mutableStateOf(settings.chargeAmps.toString()) }
-    var updateInterval by remember(settings) { mutableStateOf(settings.updateIntervalSec.toString()) }
-    var autoRefresh by remember(settings) { mutableStateOf(settings.autoRefresh) }
-    var pushNotification by remember(settings) { mutableStateOf(settings.pushNotification) }
-
-    var saveMessage by remember { mutableStateOf("") }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = "암호화 설정 및 서비스 연동",
-            color = TextPrimary,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = DarkCard),
-            border = BorderStroke(1.dp, DarkBorder)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("보안 저장소 (AES-256 Encrypted)", color = AccentAmber, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-
-                OutlinedTextField(
-                    value = supabaseUrl,
-                    onValueChange = { supabaseUrl = it },
-                    label = { Text("Supabase URL") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = supabaseAnonKey,
-                    onValueChange = { supabaseAnonKey = it },
-                    label = { Text("Supabase Anon Key") },
-                    modifier = Modifier.fillMaxWidth(),
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = kakaoMapKey,
-                    onValueChange = { kakaoMapKey = it },
-                    label = { Text("Kakao Map API Key") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = teslaRefreshToken,
-                    onValueChange = { teslaRefreshToken = it },
-                    label = { Text("Tesla Refresh Token") },
-                    modifier = Modifier.fillMaxWidth(),
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = aesPassword,
-                    onValueChange = { aesPassword = it },
-                    label = { Text("AES-256 비밀번호") },
-                    modifier = Modifier.fillMaxWidth(),
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true
-                )
+                Icon(imageVector = icon, contentDescription = null, tint = accentColor, modifier = Modifier.size(20.dp))
+                Text(text = title, color = Color.Gray, fontSize = 12.sp)
             }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = DarkCard),
-            border = BorderStroke(1.dp, DarkBorder)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text("충전 및 동기화 설정", color = AccentBlue, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedTextField(
-                        value = targetSoc,
-                        onValueChange = { targetSoc = it },
-                        label = { Text("목표 SOC (%)") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = chargeAmps,
-                        onValueChange = { chargeAmps = it },
-                        label = { Text("충전 전류 (A)") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                }
-
-                OutlinedTextField(
-                    value = updateInterval,
-                    onValueChange = { updateInterval = it },
-                    label = { Text("동기화 주기 (초)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("자동 새로고침", color = TextPrimary, fontSize = 14.sp)
-                    Switch(
-                        checked = autoRefresh,
-                        onCheckedChange = { autoRefresh = it }
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("푸시 알림 수신", color = TextPrimary, fontSize = 14.sp)
-                    Switch(
-                        checked = pushNotification,
-                        onCheckedChange = { pushNotification = it }
-                    )
-                }
-            }
-        }
-
-        Button(
-            onClick = {
-                val newSettings = AppSettings(
-                    supabaseUrl = supabaseUrl,
-                    supabaseAnonKey = supabaseAnonKey,
-                    kakaoMapKey = kakaoMapKey,
-                    teslaRefreshToken = teslaRefreshToken,
-                    aesPassword = aesPassword,
-                    targetSoc = targetSoc.toIntOrNull() ?: 80,
-                    chargeAmps = chargeAmps.toIntOrNull() ?: 32,
-                    updateIntervalSec = updateInterval.toIntOrNull() ?: 30,
-                    autoRefresh = autoRefresh,
-                    pushNotification = pushNotification
-                )
-                viewModel.saveSettings(newSettings)
-                saveMessage = "설정이 성공적으로 저장되었습니다."
-            },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = AccentAmber)
-        ) {
-            Icon(Icons.Default.Save, contentDescription = "저장")
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("설정 암호화 저장", fontSize = 15.sp, fontWeight = FontWeight.Bold)
-        }
-
-        if (saveMessage.isNotEmpty()) {
-            Text(
-                text = saveMessage,
-                color = AccentGreen,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 4.dp)
-            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = value, color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = subtext, color = Color.Gray, fontSize = 11.sp)
         }
     }
 }
