@@ -1,96 +1,114 @@
-package com.mdkdw1.ui.tesla
+package com.mdkdw1/ui/tesla
 
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
-class TeslaRepository(initialSettings: AppSettings) {
+class TeslaRepository {
 
-    private var currentSettings: AppSettings = initialSettings
-
-    private val _vehicleState = MutableStateFlow(VehicleState())
-    val vehicleState: StateFlow<VehicleState> = _vehicleState.asStateFlow()
-
-    private val _degradationRecords = MutableStateFlow(
-        listOf(
-            DegradationRecord("1", "2024-01-15", 5000.0, 528.0, 1.2),
-            DegradationRecord("2", "2024-03-20", 12000.0, 524.0, 1.9),
-            DegradationRecord("3", "2024-06-10", 21000.0, 520.0, 2.7),
-            DegradationRecord("4", "2024-09-05", 29000.0, 517.0, 3.2),
-            DegradationRecord("5", "2024-12-01", 34520.0, 515.0, 3.6)
+    suspend fun fetchVehicleState(settings: AppSettings): VehicleState = withContext(Dispatchers.IO) {
+        VehicleState(
+            vehicleName = "Model Y Long Range",
+            batteryLevel = 82,
+            estimatedRangeKm = 412,
+            isCharging = false,
+            chargingPowerKw = 0.0,
+            insideTempC = 21.5,
+            outsideTempC = 18.0,
+            isLocked = true,
+            climateOn = false,
+            sentryMode = true,
+            trunkOpen = false,
+            frunkOpen = false,
+            totalMileageKm = 34500,
+            lastUpdated = "방금 전"
         )
-    )
-    val degradationRecords: StateFlow<List<DegradationRecord>> = _degradationRecords.asStateFlow()
+    }
 
-    private val _chargeRecords = MutableStateFlow(
+    suspend fun fetchBatteryDegradation(): List<DegradationRecord> = withContext(Dispatchers.IO) {
         listOf(
-            ChargeRecord("1", "2024-12-20", "수원 슈퍼차저", 45.2, 16200, 35, "Supercharger"),
-            ChargeRecord("2", "2024-12-18", "집 완속 충전기", 32.0, 6400, 360, "Home AC"),
-            ChargeRecord("3", "2024-12-15", "강남 슈퍼차저", 50.1, 18000, 40, "Supercharger"),
-            ChargeRecord("4", "2024-12-10", "판교 공공충전소", 28.5, 9100, 120, "Public DC")
+            DegradationRecord("2023-01", 5000, 99.5f, 78.0f),
+            DegradationRecord("2023-06", 12000, 98.2f, 77.0f),
+            DegradationRecord("2023-12", 20000, 97.1f, 76.1f),
+            DegradationRecord("2024-03", 28000, 96.0f, 75.2f),
+            DegradationRecord("2024-07", 34500, 95.2f, 74.6f)
         )
-    )
-    val chargeRecords: StateFlow<List<ChargeRecord>> = _chargeRecords.asStateFlow()
+    }
 
-    private val _consumableItems = MutableStateFlow(
+    suspend fun fetchChargingHistory(): List<ChargeRecord> = withContext(Dispatchers.IO) {
         listOf(
-            ConsumableItem("1", "에어컨 캐빈 필터", "filter", "2024-05-10", 20000.0, 20000.0, 34520.0),
-            ConsumableItem("2", "타이어 위치 교환", "tire", "2024-08-01", 25000.0, 15000.0, 34520.0),
-            ConsumableItem("3", "브레이크 오일 테스트", "fluid", "2023-11-15", 10000.0, 40000.0, 34520.0),
-            ConsumableItem("4", "와이퍼 블레이드", "wiper", "2024-04-01", 18000.0, 20000.0, 34520.0)
+            ChargeRecord("chg_1", "2024-07-25", "수원 슈퍼차저", 45.2f, 32, 14200, 20, 80),
+            ChargeRecord("chg_2", "2024-07-20", "집밥 완속충전", 38.0f, 360, 7600, 30, 80),
+            ChargeRecord("chg_3", "2024-07-15", "판교 슈퍼차저", 52.1f, 38, 16400, 15, 85),
+            ChargeRecord("chg_4", "2024-07-10", "강남 슈퍼차저", 30.5f, 22, 9800, 40, 80)
         )
-    )
-    val consumableItems: StateFlow<List<ConsumableItem>> = _consumableItems.asStateFlow()
-
-    fun updateConfig(settings: AppSettings) {
-        this.currentSettings = settings
     }
 
-    suspend fun refreshVehicleState() {
-        val current = _vehicleState.value
-        _vehicleState.value = current.copy(lastUpdated = "방금 전")
+    suspend fun fetchConsumables(): List<ConsumableItem> = withContext(Dispatchers.IO) {
+        listOf(
+            ConsumableItem(
+                id = "c1",
+                name = "캐빈 에어 필터",
+                lastReplacedKm = 15000,
+                replacementIntervalKm = 20000,
+                currentMileageKm = 34500,
+                lastReplacedOdoKm = 15000,
+                lastReplacedDate = "2023-08-15"
+            ),
+            ConsumableItem(
+                id = "c2",
+                name = "와이퍼 블레이드",
+                lastReplacedKm = 20000,
+                replacementIntervalKm = 15000,
+                currentMileageKm = 34500,
+                lastReplacedOdoKm = 20000,
+                lastReplacedDate = "2023-11-20"
+            ),
+            ConsumableItem(
+                id = "c3",
+                name = "브레이크 오일",
+                lastReplacedKm = 0,
+                replacementIntervalKm = 40000,
+                currentMileageKm = 34500,
+                lastReplacedOdoKm = 0,
+                lastReplacedDate = "2022-01-10"
+            ),
+            ConsumableItem(
+                id = "c4",
+                name = "타이어 위치 교환",
+                lastReplacedKm = 25000,
+                replacementIntervalKm = 10000,
+                currentMileageKm = 34500,
+                lastReplacedOdoKm = 25000,
+                lastReplacedDate = "2024-02-10"
+            )
+        )
     }
 
-    suspend fun setLock(locked: Boolean) {
-        val current = _vehicleState.value
-        _vehicleState.value = current.copy(isLocked = locked)
+    suspend fun toggleDoorLock(currentState: VehicleState): VehicleState = withContext(Dispatchers.IO) {
+        currentState.copy(isLocked = !currentState.isLocked)
     }
 
-    suspend fun setClimate(enabled: Boolean) {
-        val current = _vehicleState.value
-        _vehicleState.value = current.copy(climateOn = enabled)
+    suspend fun toggleClimate(currentState: VehicleState): VehicleState = withContext(Dispatchers.IO) {
+        currentState.copy(climateOn = !currentState.climateOn)
     }
 
-    suspend fun setSentry(enabled: Boolean) {
-        val current = _vehicleState.value
-        _vehicleState.value = current.copy(sentryMode = enabled)
+    suspend fun toggleSentry(currentState: VehicleState): VehicleState = withContext(Dispatchers.IO) {
+        currentState.copy(sentryMode = !currentState.sentryMode)
     }
 
-    suspend fun toggleTrunk() {
-        val current = _vehicleState.value
-        _vehicleState.value = current.copy(trunkOpen = !current.trunkOpen)
+    suspend fun toggleTrunk(currentState: VehicleState): VehicleState = withContext(Dispatchers.IO) {
+        currentState.copy(trunkOpen = !currentState.trunkOpen)
     }
 
-    suspend fun toggleFrunk() {
-        val current = _vehicleState.value
-        _vehicleState.value = current.copy(frunkOpen = !current.frunkOpen)
+    suspend fun toggleFrunk(currentState: VehicleState): VehicleState = withContext(Dispatchers.IO) {
+        currentState.copy(frunkOpen = !currentState.frunkOpen)
     }
 
-    suspend fun addChargeRecord(record: ChargeRecord) {
-        _chargeRecords.value = listOf(record) + _chargeRecords.value
+    suspend fun addChargeRecord(record: ChargeRecord): List<ChargeRecord> = withContext(Dispatchers.IO) {
+        fetchChargingHistory() + record
     }
 
-    suspend fun resetConsumable(id: String) {
-        val currentOdo = _vehicleState.value.odometerKm
-        _consumableItems.value = _consumableItems.value.map { item ->
-            if (item.id == id) {
-                item.copy(
-                    lastReplacedOdoKm = currentOdo,
-                    lastReplacedDate = "2024-12-25"
-                )
-            } else {
-                item
-            }
-        }
+    suspend fun updateConsumable(item: ConsumableItem): List<ConsumableItem> = withContext(Dispatchers.IO) {
+        fetchConsumables().map { if (it.id == item.id) item else it }
     }
 }

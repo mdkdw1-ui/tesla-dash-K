@@ -1,63 +1,77 @@
-package com.mdkdw1.ui.tesla
+package com.mdkdw1/ui/tesla
 
+/**
+ * 앱 보안 설정 모델
+ */
 data class AppSettings(
     val supabaseUrl: String = "",
     val supabaseKey: String = "",
     val kakaoKey: String = "",
     val teslaToken: String = "",
-    val vehicleId: String = ""
-)
+    val vehicleId: String = "",
+    val githubKey: String = ""
+) {
+    val kakaoMapKey: String get() = kakaoKey
+}
 
+/**
+ * 테슬라 차량 제어 및 상태 모델
+ */
 data class VehicleState(
-    val isOnline: Boolean = true,
-    val batteryLevel: Int = 78,
-    val estimatedRangeKm: Int = 385,
-    val extrapolated100RangeKm: Int = 493,
-    val chargeLimit: Int = 80,
+    val vehicleName: String = "Model Y Long Range",
+    val batteryLevel: Int = 82,
+    val estimatedRangeKm: Int = 412,
     val isCharging: Boolean = false,
-    val isChargePortOpen: Boolean = false,
-    val insideTemp: Float = 21.5f,
-    val outsideTemp: Float = 18.0f,
-    val targetTemp: Float = 21.0f,
-    val speedKmh: Int = 0,
+    val chargingPowerKw: Double = 0.0,
+    val insideTempC: Double = 21.5,
+    val outsideTempC: Double = 18.0,
     val isLocked: Boolean = true,
-    val isClimateOn: Boolean = false,
-    val isSentryOn: Boolean = true,
-    val latitude: Double = 37.5665,
-    val longitude: Double = 126.9780,
-    val odometerKm: Double = 15420.0
+    val climateOn: Boolean = false,
+    val sentryMode: Boolean = true,
+    val trunkOpen: Boolean = false,
+    val frunkOpen: Boolean = false,
+    val totalMileageKm: Int = 34500,
+    val lastUpdated: String = "방금 전"
 )
 
-data class BatteryDegradationData(
+/**
+ * 배터리 열화율 데이터 모델
+ */
+data class DegradationRecord(
     val date: String = "",
-    val mileage: Int = 0,
-    val degradationRate: Float = 0f,
-    val estimatedMaxRangeKm: Int = 0
-)
+    val mileageKm: Int = 0,
+    val healthPercent: Float = 100f,
+    val capacityAh: Float = 0f
+) {
+    val soh: Float get() = healthPercent
+    val odo: Int get() = mileageKm
+}
+typealias BatteryDegradation = DegradationRecord
 
-data class ChargingSession(
+/**
+ * 충전 히스토리 기록 모델
+ */
+data class ChargeRecord(
     val id: String = "",
     val date: String = "",
     val location: String = "",
-    val startPercent: Int = 0,
-    val endPercent: Int = 0,
-    val energyAddedKwh: Double = 0.0,
-    val cost: Int = 0,
-    val remainingPercent: Int = 0
+    val addedKwh: Float = 0f,
+    val durationMinutes: Int = 0,
+    val costKrw: Int = 0,
+    val startSoc: Int = 0,
+    val endSoc: Int = 0
 )
+typealias ChargingRecord = ChargeRecord
 
+/**
+ * 소모품 관리 데이터 모델
+ */
 data class ConsumableItem(
     val id: String = "",
     val name: String = "",
     val lastReplacedKm: Int = 0,
-    val replacementIntervalKm: Int = 10000,
-    val currentMileageKm: Int = 0
-) {
-    val remainingKm: Int
-        get() = (lastReplacedKm + replacementIntervalKm) - currentMileageKm
-
-    val remainingPercent: Float
-        get() = if (replacementIntervalKm > 0) {
-            ((remainingKm.toFloat() / replacementIntervalKm.toFloat()) * 100f).coerceIn(0f, 100f)
-        } else 0f
-}
+    val replacementIntervalKm: Int = 20000,
+    val currentMileageKm: Int = 0,
+    val lastReplacedOdoKm: Int = 0,
+    val lastReplacedDate: String = ""
+)

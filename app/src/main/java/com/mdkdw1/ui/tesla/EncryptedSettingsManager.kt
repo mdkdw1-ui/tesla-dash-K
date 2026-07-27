@@ -1,44 +1,47 @@
-package com.mdkdw1.ui.tesla
+package com.mdkdw1/ui/tesla
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme
-import androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme
-import androidx.security.crypto.MasterKeys
+import androidx.security.crypto.MasterKey
 
 class EncryptedSettingsManager(context: Context) {
 
-    private val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+    private val masterKey = MasterKey.Builder(context)
+        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+        .build()
 
-    private val prefs = EncryptedSharedPreferences.create(
-        "tesla_secure_settings",
-        masterKeyAlias,
+    private val sharedPreferences: SharedPreferences = EncryptedSharedPreferences.create(
         context,
-        PrefKeyEncryptionScheme.AES256_SKEY,
-        PrefValueEncryptionScheme.AES256_GCM
+        "encrypted_tesla_settings",
+        masterKey,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SKEY,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    fun getSettings(): AppSettings {
-        return AppSettings(
-            supabaseUrl = prefs.getString("supabaseUrl", "") ?: "",
-            supabaseKey = prefs.getString("supabaseKey", "") ?: "",
-            kakaoKey = prefs.getString("kakaoKey", "") ?: "",
-            teslaToken = prefs.getString("teslaToken", "") ?: "",
-            vehicleId = prefs.getString("vehicleId", "") ?: ""
-        )
-    }
-
     fun saveSettings(settings: AppSettings) {
-        prefs.edit()
-            .putString("supabaseUrl", settings.supabaseUrl)
-            .putString("supabaseKey", settings.supabaseKey)
-            .putString("kakaoKey", settings.kakaoKey)
-            .putString("teslaToken", settings.teslaToken)
-            .putString("vehicleId", settings.vehicleId)
+        sharedPreferences.edit()
+            .putString("supabase_url", settings.supabaseUrl)
+            .putString("supabase_key", settings.supabaseKey)
+            .putString("kakao_key", settings.kakaoKey)
+            .putString("tesla_token", settings.teslaToken)
+            .putString("vehicle_id", settings.vehicleId)
+            .putString("github_key", settings.githubKey)
             .apply()
     }
 
+    fun loadSettings(): AppSettings {
+        return AppSettings(
+            supabaseUrl = sharedPreferences.getString("supabase_url", "") ?: "",
+            supabaseKey = sharedPreferences.getString("supabase_key", "") ?: "",
+            kakaoKey = sharedPreferences.getString("kakao_key", "") ?: "",
+            teslaToken = sharedPreferences.getString("tesla_token", "") ?: "",
+            vehicleId = sharedPreferences.getString("vehicle_id", "") ?: "",
+            githubKey = sharedPreferences.getString("github_key", "") ?: ""
+        )
+    }
+
     fun clearSettings() {
-        prefs.edit().clear().apply()
+        sharedPreferences.edit().clear().apply()
     }
 }

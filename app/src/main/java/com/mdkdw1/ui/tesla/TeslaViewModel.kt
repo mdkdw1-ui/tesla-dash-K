@@ -1,4 +1,4 @@
-package com.mdkdw1.ui.tesla
+package com.mdkdw1/ui/tesla
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -11,97 +11,97 @@ import kotlinx.coroutines.launch
 class TeslaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val settingsManager = EncryptedSettingsManager(application)
+    private val repository = TeslaRepository()
 
-    private val _appSettings = MutableStateFlow(settingsManager.getSettings())
-    val appSettings: StateFlow<AppSettings> = _appSettings.asStateFlow()
+    private val _settings = MutableStateFlow(AppSettings())
+    val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
     private val _vehicleState = MutableStateFlow(VehicleState())
     val vehicleState: StateFlow<VehicleState> = _vehicleState.asStateFlow()
 
-    private val _chargingHistory = MutableStateFlow<List<ChargingSession>>(emptyList())
-    val chargingHistory: StateFlow<List<ChargingSession>> = _chargingHistory.asStateFlow()
+    private val _batteryDegradation = MutableStateFlow<List<DegradationRecord>>(emptyList())
+    val batteryDegradation: StateFlow<List<DegradationRecord>> = _batteryDegradation.asStateFlow()
 
-    private val _batteryDegradation = MutableStateFlow<List<BatteryDegradationData>>(emptyList())
-    val batteryDegradation: StateFlow<List<BatteryDegradationData>> = _batteryDegradation.asStateFlow()
+    private val _chargingHistory = MutableStateFlow<List<ChargeRecord>>(emptyList())
+    val chargingHistory: StateFlow<List<ChargeRecord>> = _chargingHistory.asStateFlow()
 
     private val _consumables = MutableStateFlow<List<ConsumableItem>>(emptyList())
     val consumables: StateFlow<List<ConsumableItem>> = _consumables.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     init {
-        loadData()
+        loadSettings()
+        refreshAllData()
     }
 
-    fun loadData() {
-        _batteryDegradation.value = listOf(
-            BatteryDegradationData("2024-01", 1000, 0.5f, 500),
-            BatteryDegradationData("2024-03", 5000, 1.2f, 496),
-            BatteryDegradationData("2024-06", 10000, 2.1f, 491),
-            BatteryDegradationData("2024-09", 15000, 2.8f, 488)
-        )
-        _chargingHistory.value = listOf(
-            ChargingSession("1", "2024-09-20", "강남 슈퍼차저", 20, 80, 42.5, 12500, 80),
-            ChargingSession("2", "2024-09-22", "집 완속 충전기", 35, 90, 38.0, 7600, 90)
-        )
-        _consumables.value = listOf(
-            ConsumableItem("1", "에어컨 필터", 0, 15000, 12000),
-            ConsumableItem("2", "와이퍼 블레이드", 0, 20000, 8000),
-            ConsumableItem("3", "타이어 위치 교환", 0, 10000, 9500),
-            ConsumableItem("4", "브레이크 오일", 0, 40000, 15000)
-        )
-    }
-
-    fun refreshData() {
-        viewModelScope.launch {
-            loadData()
-        }
+    fun loadSettings() {
+        val loaded = settingsManager.loadSettings()
+        _settings.value = loaded
     }
 
     fun saveSettings(newSettings: AppSettings) {
         settingsManager.saveSettings(newSettings)
-        _appSettings.value = newSettings
-        refreshData()
+        _settings.value = newSettings
+        refreshAllData()
     }
 
-    fun clearSettings() {
-        settingsManager.clearSettings()
-        _appSettings.value = AppSettings()
+    fun refreshAllData() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                _vehicleState.value = repository.fetchVehicleState(_settings.value)
+                _batteryDegradation.value = repository.fetchBatteryDegradation()
+                _chargingHistory.value = repository.fetchChargingHistory()
+                _consumables.value = repository.fetchConsumables()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
     }
 
     fun toggleDoorLock() {
-        _vehicleState.value = _vehicleState.value.copy(isLocked = !_vehicleState.value.isLocked)
+        viewModelScope.launch {
+            _vehicleState.value = repository.toggleDoorLock(_vehicleState.value)
+        }
     }
 
-    fun toggleClimate(enable: Boolean? = null) {
-        val current = _vehicleState.value.isClimateOn
-        _vehicleState.value = _vehicleState.value.copy(isClimateOn = enable ?: !current)
+    fun toggleClimate() {
+        viewModelScope.launch {
+            _vehicleState.value = repository.toggleClimate(_vehicleState.value)
+        }
     }
 
-    fun toggleSentryMode() {
-        _vehicleState.value = _vehicleState.value.copy(isSentryOn = !_vehicleState.value.isSentryOn)
+    fun toggleSentry() {
+        viewModelScope.launch {
+            _vehicleState.value = repository.toggleSentry(_vehicleState.value)
+        }
     }
 
-    fun openTrunk() {
-        // 트렁크 개폐 제어 로직
+    fun toggleTrunk() {
+        viewModelScope.launch {
+            _vehicleState.value = repository.toggleTrunk(_vehicleState.value)
+        }
     }
 
-    fun openFrunk() {
-        // 프렁크 개폐 제어 로직
+    fun toggleFrunk() {
+        viewModelScope.launch {
+            _vehicleState.value = repository.toggleFrunk(_vehicleState.value)
+        }
     }
 
-    fun toggleChargePort() {
-        _vehicleState.value = _vehicleState.value.copy(isChargePortOpen = !_vehicleState.value.isChargePortOpen)
+    fun addChargeRecord(record: ChargeRecord) {
+        viewModelScope.launch {
+            _chargingHistory.value = repository.addChargeRecord(record)
+        }
     }
 
-    fun flashLights() {
-        // 전조등 점등 제어 로직
-    }
-
-    fun honkHorn() {
-        // 경적 울림 제어 로직
-    }
-
-    fun adjustTargetTemp(delta: Float) {
-        val newTemp = (_vehicleState.value.targetTemp + delta).coerceIn(16f, 30f)
-        _vehicleState.value = _vehicleState.value.copy(targetTemp = newTemp)
+    fun updateConsumable(item: ConsumableItem) {
+        viewModelScope.launch {
+            _consumables.value = repository.updateConsumable(item)
+        }
     }
 }
