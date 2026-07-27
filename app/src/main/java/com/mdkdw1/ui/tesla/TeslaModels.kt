@@ -1,77 +1,71 @@
 package com.mdkdw1.ui.tesla
 
-// 앱 설정 정보 (GitHub 키/토큰 중복 제거, 테슬라 ID/PW 제거)
 data class AppSettings(
     val supabaseUrl: String = "",
-    val supabaseKey: String = "",
+    val supabaseAnonKey: String = "",
     val kakaoMapKey: String = "",
-    val githubToken: String = "",
-    val isAutoSync: Boolean = true,
-    val syncIntervalMinutes: Int = 15
+    val teslaRefreshToken: String = "",
+    val aesPassword: String = "",
+    val targetSoc: Int = 80,
+    val chargeAmps: Int = 32,
+    val updateIntervalSec: Int = 30,
+    val autoRefresh: Boolean = true,
+    val pushNotification: Boolean = true
 )
 
-// 내 차량 정보 및 통합 상태
 data class VehicleState(
     val vehicleName: String = "Model Y Long Range",
-    val model: String = "Model Y",
-    val vin: String = "5YJSA1E28MF******",
-    val odometerKm: Double = 34520.0,
-    val batteryPercent: Int = 78,
-    val estimatedRangeKm: Int = 385,
-    val insideTemp: Double = 21.5,
-    val outsideTemp: Double = 18.0,
-    val sentryModeOn: Boolean = true,
+    val batteryLevel: Int = 78,
+    val batteryRangeKm: Double = 412.5,
     val isCharging: Boolean = false,
-    val chargePowerKw: Double = 0.0,
-    val flTire: Double = 42.0, // 전좌 (PSI)
-    val frTire: Double = 42.0, // 전우 (PSI)
-    val rlTire: Double = 41.5, // 후좌 (PSI)
-    val rrTire: Double = 41.5, // 후우 (PSI)
-    val statusText: String = "Online",
-    val carSoftwareVersion: String = "v12 (2024.14.9)",
-    val lastUpdatedTimestamp: Long = System.currentTimeMillis()
+    val chargeState: String = "충전 대기",
+    val isLocked: Boolean = true,
+    val climateOn: Boolean = false,
+    val insideTempC: Double = 21.5,
+    val outsideTempC: Double = 18.0,
+    val sentryMode: Boolean = true,
+    val trunkOpen: Boolean = false,
+    val frunkOpen: Boolean = false,
+    val speedKm: Double = 0.0,
+    val odometerKm: Double = 34520.0,
+    val tirePressureFl: Double = 2.9,
+    val tirePressureFr: Double = 2.9,
+    val tirePressureRl: Double = 2.9,
+    val tirePressureRr: Double = 2.9,
+    val lastUpdated: String = "방금 전"
 )
 
-// 주행 기록 항목
-data class DriveLogItem(
+data class DegradationRecord(
     val id: String = "",
-    val date: String = "",
-    val startLocation: String = "",
-    val endLocation: String = "",
-    val distanceKm: Double = 0.0,
-    val energyUsedKwh: Double = 0.0,
-    val efficiencyWhKm: Double = 0.0
+    val date: String,
+    val odometerKm: Double,
+    val fullRangeKm: Double,
+    val degradationPct: Double
 )
 
-// 월간 리포트
-data class MonthlyReport(
-    val month: String = "",
-    val totalDistanceKm: Double = 0.0,
-    val totalChargeCostWon: Int = 0,
-    val totalEnergyKwh: Double = 0.0
-)
-
-// 배터리 열화 데이터
-data class BatteryDegradationItem(
-    val date: String = "",
-    val degradationPercent: Double = 0.0,
-    val fullRangeKm: Double = 0.0
-)
-
-// 감시 가디언 이벤트 데이터
-data class SentryEventItem(
+data class ChargeRecord(
     val id: String = "",
-    val timestamp: String = "",
-    val location: String = "",
-    val eventType: String = "Motion Detected",
-    val videoUrl: String? = null
+    val date: String,
+    val location: String,
+    val addedKwh: Double,
+    val costKrw: Int,
+    val durationMinutes: Int,
+    val chargeType: String
 )
 
-// 소모품 항목 데이터
 data class ConsumableItem(
-    val id: String = "",
-    val name: String = "",
-    val lastChangedKm: Double = 0.0,
-    val replacementIntervalKm: Double = 20000.0,
-    val statusPercent: Int = 100
-)
+    val id: String,
+    val name: String,
+    val iconName: String,
+    val lastReplacedDate: String,
+    val lastReplacedOdoKm: Double,
+    val replacementIntervalKm: Double,
+    val currentOdoKm: Double
+) {
+    val remainingPct: Int
+        get() {
+            val driven = currentOdoKm - lastReplacedOdoKm
+            val remain = replacementIntervalKm - driven
+            return ((remain / replacementIntervalKm) * 100).toInt().coerceIn(0, 100)
+        }
+}

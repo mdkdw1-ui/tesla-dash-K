@@ -12,35 +12,40 @@ class EncryptedSettingsManager(context: Context) {
 
     private val sharedPreferences = EncryptedSharedPreferences.create(
         context,
-        "tesla_dash_k_secure_prefs",
+        "encrypted_tesla_settings_prefs",
         masterKey,
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SKEY,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
     fun saveSettings(settings: AppSettings) {
-        sharedPreferences.edit()
-            .putString("supabase_url", settings.supabaseUrl)
-            .putString("supabase_key", settings.supabaseKey)
-            .putString("kakao_map_key", settings.kakaoMapKey)
-            .putString("github_token", settings.githubToken)
-            .putBoolean("auto_sync", settings.isAutoSync)
-            .putInt("sync_interval", settings.syncIntervalMinutes)
-            .apply()
+        sharedPreferences.edit().apply {
+            putString("supabaseUrl", settings.supabaseUrl)
+            putString("supabaseAnonKey", settings.supabaseAnonKey)
+            putString("kakaoMapKey", settings.kakaoMapKey)
+            putString("teslaRefreshToken", settings.teslaRefreshToken)
+            putString("aesPassword", settings.aesPassword)
+            putInt("targetSoc", settings.targetSoc)
+            putInt("chargeAmps", settings.chargeAmps)
+            putInt("updateIntervalSec", settings.updateIntervalSec)
+            putBoolean("autoRefresh", settings.autoRefresh)
+            putBoolean("pushNotification", settings.pushNotification)
+            apply()
+        }
     }
 
-    fun getSettings(): AppSettings {
+    fun loadSettings(): AppSettings {
         return AppSettings(
-            supabaseUrl = sharedPreferences.getString("supabase_url", "") ?: "",
-            supabaseKey = sharedPreferences.getString("supabase_key", "") ?: "",
-            kakaoMapKey = sharedPreferences.getString("kakao_map_key", "") ?: "",
-            githubToken = sharedPreferences.getString("github_token", "") ?: "",
-            isAutoSync = sharedPreferences.getBoolean("auto_sync", true),
-            syncIntervalMinutes = sharedPreferences.getInt("sync_interval", 15)
+            supabaseUrl = sharedPreferences.getString("supabaseUrl", "") ?: "",
+            supabaseAnonKey = sharedPreferences.getString("supabaseAnonKey", "") ?: "",
+            kakaoMapKey = sharedPreferences.getString("kakaoMapKey", "") ?: "",
+            teslaRefreshToken = sharedPreferences.getString("teslaRefreshToken", "") ?: "",
+            aesPassword = sharedPreferences.getString("aesPassword", "") ?: "",
+            targetSoc = sharedPreferences.getInt("targetSoc", 80),
+            chargeAmps = sharedPreferences.getInt("chargeAmps", 32),
+            updateIntervalSec = sharedPreferences.getInt("updateIntervalSec", 30),
+            autoRefresh = sharedPreferences.getBoolean("autoRefresh", true),
+            pushNotification = sharedPreferences.getBoolean("pushNotification", true)
         )
-    }
-
-    fun clearSettings() {
-        sharedPreferences.edit().clear().apply()
     }
 }

@@ -3,7 +3,11 @@ package com.mdkdw1.ui.tesla
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.lifecycle.ViewModel
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider
 
 class MainActivity : ComponentActivity() {
@@ -11,27 +15,22 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val encryptedSettingsManager = EncryptedSettingsManager(applicationContext)
-        val repository = TeslaRepository(encryptedSettingsManager)
+        val settingsManager = EncryptedSettingsManager(applicationContext)
+        val initialSettings = settingsManager.loadSettings()
+        val repository = TeslaRepository(initialSettings)
+        val factory = TeslaViewModelFactory(settingsManager, repository)
 
-        val factory = TeslaViewModelFactory(repository, encryptedSettingsManager)
         val viewModel = ViewModelProvider(this, factory)[TeslaViewModel::class.java]
 
         setContent {
-            TeslaMainScreen(viewModel = viewModel)
+            MaterialTheme(colorScheme = darkColorScheme()) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = DarkBackground
+                ) {
+                    TeslaMainScreen(viewModel = viewModel)
+                }
+            }
         }
-    }
-}
-
-class TeslaViewModelFactory(
-    private val repository: TeslaRepository,
-    private val encryptedSettingsManager: EncryptedSettingsManager
-) : ViewModelProvider.Factory {
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(TeslaViewModel::class.java)) {
-            return TeslaViewModel(repository, encryptedSettingsManager) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
