@@ -1,109 +1,77 @@
 package com.mdkdw1.ui.tesla
 
-// 앱 암호화 설정 모델
+// 앱 설정 정보 (GitHub 키/토큰 중복 제거, 테슬라 ID/PW 제거)
 data class AppSettings(
     val supabaseUrl: String = "",
     val supabaseKey: String = "",
     val kakaoMapKey: String = "",
-    val teslaClientId: String = "",
-    val teslaClientSecret: String = "",
-    val githubKey: String = "",
     val githubToken: String = "",
-    val isAutoSync: Boolean = true
+    val isAutoSync: Boolean = true,
+    val syncIntervalMinutes: Int = 15
 )
 
-// 차량 상태 정보 모델
+// 내 차량 정보 및 통합 상태
 data class VehicleState(
-    val vehicleName: String = "Model Y",
-    val batteryLevel: Int = 80,
-    val estimatedRange: Double = 380.0,
-    val maxRange: Double = 475.0,
-    val isCharging: Boolean = false,
-    val chargeLimit: Int = 80,
-    val chargeCurrent: Int = 32,
-    val isLocked: Boolean = true,
-    val climateOn: Boolean = false,
+    val vehicleName: String = "Model Y Long Range",
+    val model: String = "Model Y",
+    val vin: String = "5YJSA1E28MF******",
+    val odometerKm: Double = 34520.0,
+    val batteryPercent: Int = 78,
+    val estimatedRangeKm: Int = 385,
     val insideTemp: Double = 21.5,
     val outsideTemp: Double = 18.0,
-    val targetTemp: Double = 20.0,
-    val sentryModeOn: Boolean = false,
-    val trunkOpen: Boolean = false,
-    val frunkOpen: Boolean = false,
-    val flTire: Double = 42.0,
-    val frTire: Double = 41.5,
-    val rlTire: Double = 42.0,
-    val rrTire: Double = 42.5,
-    val statusText: String = "주차됨",
-    val lastUpdatedTimestamp: String = "방금 전"
+    val sentryModeOn: Boolean = true,
+    val isCharging: Boolean = false,
+    val chargePowerKw: Double = 0.0,
+    val flTire: Double = 42.0, // 전좌 (PSI)
+    val frTire: Double = 42.0, // 전우 (PSI)
+    val rlTire: Double = 41.5, // 후좌 (PSI)
+    val rrTire: Double = 41.5, // 후우 (PSI)
+    val statusText: String = "Online",
+    val carSoftwareVersion: String = "v12 (2024.14.9)",
+    val lastUpdatedTimestamp: Long = System.currentTimeMillis()
 )
 
-// 주행 기록 아이템
+// 주행 기록 항목
 data class DriveLogItem(
     val id: String = "",
     val date: String = "",
-    val distanceKm: Double = 0.0,
-    val durationMinutes: Int = 0,
-    val energyUsedKwh: Double = 0.0,
     val startLocation: String = "",
     val endLocation: String = "",
-    val avgEfficiencyWhPerKm: Double = 0.0
+    val distanceKm: Double = 0.0,
+    val energyUsedKwh: Double = 0.0,
+    val efficiencyWhKm: Double = 0.0
 )
 
-// 월간 주행/전비 보고서
+// 월간 리포트
 data class MonthlyReport(
     val month: String = "",
     val totalDistanceKm: Double = 0.0,
-    val totalEnergyKwh: Double = 0.0,
-    val totalCostKrw: Int = 0,
-    val avgEfficiency: Double = 0.0
+    val totalChargeCostWon: Int = 0,
+    val totalEnergyKwh: Double = 0.0
 )
 
-// 배터리 열화율 데이터 아이템
+// 배터리 열화 데이터
 data class BatteryDegradationItem(
     val date: String = "",
-    val odometerKm: Double = 0.0,
-    val maxCapacityKwh: Double = 0.0,
     val degradationPercent: Double = 0.0,
-    val estimated100PercentRange: Double = 0.0
+    val fullRangeKm: Double = 0.0
 )
 
-// 감시 모드(Sentry) 이벤트 아이템
+// 감시 가디언 이벤트 데이터
 data class SentryEventItem(
     val id: String = "",
     val timestamp: String = "",
     val location: String = "",
-    val cameraAngle: String = "",
-    val videoUrl: String = ""
+    val eventType: String = "Motion Detected",
+    val videoUrl: String? = null
 )
 
-// 소모품 관리 아이템
+// 소모품 항목 데이터
 data class ConsumableItem(
     val id: String = "",
     val name: String = "",
-    val lastReplacedDate: String = "",
-    val lastReplacedKm: Double = 0.0,
-    val replacementIntervalKm: Double = 0.0,
-    val replacementIntervalMonths: Int = 0,
-    val currentUsagePercent: Double = 0.0
-)
-
-// 일지 유형 및 아이템
-enum class JournalType {
-    DRIVE, CHARGE, MAINTENANCE, SENTRY
-}
-
-data class JournalLogItem(
-    val id: String = "",
-    val type: JournalType = JournalType.DRIVE,
-    val date: String = "",
-    val title: String = "",
-    val description: String = "",
-    val cost: Int = 0
-)
-
-// 배터리 이력
-data class BatteryRecord(
-    val date: String = "",
-    val degradationPercent: Double = 0.0,
-    val range100PercentKm: Double = 0.0
+    val lastChangedKm: Double = 0.0,
+    val replacementIntervalKm: Double = 20000.0,
+    val statusPercent: Int = 100
 )

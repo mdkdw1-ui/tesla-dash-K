@@ -1,98 +1,186 @@
 package com.mdkdw1.ui.tesla
 
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 
-class TeslaRepository(private val settingsManager: EncryptedSettingsManager) {
+class TeslaRepository(
+    private val encryptedSettingsManager: EncryptedSettingsManager
+) {
 
-    private val _vehicleState = MutableStateFlow(VehicleState())
-    val vehicleState: StateFlow<VehicleState> = _vehicleState
+    fun getSettings(): AppSettings = encryptedSettingsManager.getSettings()
 
-    private val _settings = MutableStateFlow(settingsManager.getSettings())
-    val settings: StateFlow<AppSettings> = _settings
-
-    fun getSettings(): AppSettings {
-        return settingsManager.getSettings()
+    fun saveSettings(settings: AppSettings) {
+        encryptedSettingsManager.saveSettings(settings)
     }
 
-    fun saveSettings(newSettings: AppSettings) {
-        settingsManager.saveSettings(newSettings)
-        _settings.value = newSettings
+    // Supabase REST API를 호출하여 내 실제 차량 정보 동기화
+    suspend fun fetchVehicleState(): VehicleState = withContext(Dispatchers.IO) {
+        val settings = getSettings()
+        if (settings.supabaseUrl.isBlank() || settings.supabaseKey.isBlank()) {
+            return@withContext VehicleState() // 미설정 시 기본 상태
+        }
+
+        try {
+            val responseJson = executeSupabaseGet("${settings.supabaseUrl}/rest/v1/vehicle_state?select=*&limit=1", settings.supabaseKey)
+            if (responseJson != null && responseJson.length() > 0) {
+                val obj = responseJson.getJSONObject(0)
+                return@withContext VehicleState(
+                    vehicleName = obj.optString("vehicle_name", "Model Y Long Range"),
+                    model = obj.optString("model", "Model Y"),
+                    vin = obj.optString("vin", "5YJSA1E28MF******"),
+                    odometerKm = obj.optDouble("odometer_km", 34520.0),
+                    batteryPercent = obj.optInt("battery_percent", 78),
+                    estimatedRangeKm = obj.optInt("estimated_range_km", 385),
+                    insideTemp = obj.optDouble("inside_temp", 21.5),
+                    outsideTemp = obj.optDouble("outside_temp", 18.0),
+                    sentryModeOn = obj.optBoolean("sentry_mode_on", true),
+                    isCharging = obj.optBoolean("is_charging", false),
+                    chargePowerKw = obj.optDouble("charge_power_kw", 0.0),
+                    flTire = obj.optDouble("fl_tire", 42.0),
+                    frTire = obj.optDouble("fr_tire", 42.0),
+                    rlTire = obj.optDouble("rl_tire", 41.5),
+                    rrTire = obj.optDouble("rr_tire", 41.5),
+                    statusText = obj.optString("status_text", "Online"),
+                    carSoftwareVersion = obj.optString("software_version", "v12 (2024.14.9)"),
+                    lastUpdatedTimestamp = System.currentTimeMillis()
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return@withContext VehicleState()
     }
 
-    fun toggleLock() {
-        val current = _vehicleState.value
-        _vehicleState.value = current.copy(
-            isLocked = !current.isLocked,
-            statusText = if (!current.isLocked) "잠김" else "잠금 해제됨"
+    // 주행 기록 동기화
+    suspend fun fetchDriveLogs(): List<DriveLogItem> = withContext(Dispatchers.IO) {
+        val settings = getSettings()
+        if (settings.supabaseUrl.isNotBlank() && settings.supabaseKey.isNotBlank()) {
+            try {
+                val jsonArray = executeSupabaseGet("${settings.supabaseUrl}/rest/v1/drive_logs?select=*&order=date.desc", settings.supabaseKey)
+                if (jsonArray != null && jsonArray.length() > 0) {
+                    val list = mutableListOf<DriveLogItem>()
+                    for (i in 0 until jsonArray.length()) {
+                        val obj = jsonArray.getJSONObject(i)
+                        list.add(
+                            DriveLogItem(
+                                id = obj.optString("id", i.toString()),
+                                date = obj.optString("date", ""),
+                                startLocation = obj.optString("start_location", ""),
+                                endLocation = obj.optString("end_location", ""),
+                                distanceKm = obj.optDouble("distance_km", 0.0),
+                                energyUsedKwh = obj.optDouble("energy_used_kwh", 0.0),
+                                efficiencyWhKm = obj.optDouble("efficiency_wh_km", 0.0)
+                            )
+                        )
+                    }
+                    return@withContext list
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        // 기본 제공
+        return@withContext listOf(
+            DriveLogItem("1", "2026-07-27", "서울 강남구", "경기 성남시", 24.5, 3.8, 155.0),
+            DriveLogItem("2", "2026-07-26", "경기 성남시", "인천 연수구", 58.2, 9.2, 158.0),
+            DriveLogItem("3", "2026-07-25", "인천 연수구", "서울 강남구", 52.1, 8.1, 155.0)
         )
     }
 
-    fun toggleClimate() {
-        val current = _vehicleState.value
-        _vehicleState.value = current.copy(
-            climateOn = !current.climateOn
+    // 배터리 열화 데이터
+    suspend fun fetchBatteryDegradation(): List<BatteryDegradationItem> = withContext(Dispatchers.IO) {
+        val settings = getSettings()
+        if (settings.supabaseUrl.isNotBlank() && settings.supabaseKey.isNotBlank()) {
+            try {
+                val jsonArray = executeSupabaseGet("${settings.supabaseUrl}/rest/v1/battery_degradation?select=*&order=date.asc", settings.supabaseKey)
+                if (jsonArray != null && jsonArray.length() > 0) {
+                    val list = mutableListOf<BatteryDegradationItem>()
+                    for (i in 0 until jsonArray.length()) {
+                        val obj = jsonArray.getJSONObject(i)
+                        list.add(
+                            BatteryDegradationItem(
+                                date = obj.optString("date", ""),
+                                degradationPercent = obj.optDouble("degradation_percent", 0.0),
+                                fullRangeKm = obj.optDouble("full_range_km", 0.0)
+                            )
+                        )
+                    }
+                    return@withContext list
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        return@withContext listOf(
+            BatteryDegradationItem("2024-01", 100.0, 505.0),
+            BatteryDegradationItem("2024-06", 98.8, 499.0),
+            BatteryDegradationItem("2025-01", 97.5, 492.0),
+            BatteryDegradationItem("2025-06", 96.8, 489.0),
+            BatteryDegradationItem("2026-01", 96.2, 486.0),
+            BatteryDegradationItem("2026-07", 95.8, 484.0)
         )
     }
 
-    fun toggleCharging() {
-        val current = _vehicleState.value
-        _vehicleState.value = current.copy(
-            isCharging = !current.isCharging,
-            statusText = if (!current.isCharging) "충전 중" else "주차됨"
+    // 감시 이벤트 데이터
+    suspend fun fetchSentryEvents(): List<SentryEventItem> = withContext(Dispatchers.IO) {
+        val settings = getSettings()
+        if (settings.supabaseUrl.isNotBlank() && settings.supabaseKey.isNotBlank()) {
+            try {
+                val jsonArray = executeSupabaseGet("${settings.supabaseUrl}/rest/v1/sentry_events?select=*&order=created_at.desc", settings.supabaseKey)
+                if (jsonArray != null && jsonArray.length() > 0) {
+                    val list = mutableListOf<SentryEventItem>()
+                    for (i in 0 until jsonArray.length()) {
+                        val obj = jsonArray.getJSONObject(i)
+                        list.add(
+                            SentryEventItem(
+                                id = obj.optString("id", i.toString()),
+                                timestamp = obj.optString("timestamp", ""),
+                                location = obj.optString("location", ""),
+                                eventType = obj.optString("event_type", "Motion Detected"),
+                                videoUrl = obj.optString("video_url", null)
+                            )
+                        )
+                    }
+                    return@withContext list
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        return@withContext listOf(
+            SentryEventItem("s1", "2026-07-27 13:42", "강남역 지하주차장 B2", "움직임 감지"),
+            SentryEventItem("s2", "2026-07-26 19:15", "판교 아파트 지하주차장", "차량 근접 감지"),
+            SentryEventItem("s3", "2026-07-24 11:05", "송도 야외 주차장", "충격 감지 (경미)")
         )
     }
 
-    fun toggleSentryMode() {
-        val current = _vehicleState.value
-        _vehicleState.value = current.copy(
-            sentryModeOn = !current.sentryModeOn
-        )
-    }
+    private fun executeSupabaseGet(urlString: String, apiKey: String): JSONArray? {
+        var connection: HttpURLConnection? = null
+        return try {
+            val url = URL(urlString)
+            connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.setRequestProperty("Accept", "application/json")
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
 
-    fun getDriveLogs(): List<DriveLogItem> {
-        return listOf(
-            DriveLogItem("1", "2026-07-26", 45.2, 50, 8.5, "서울 강남구", "경기 성남시", 188.0),
-            DriveLogItem("2", "2026-07-25", 112.0, 95, 21.0, "경기 성남시", "강원 원주시", 187.5),
-            DriveLogItem("3", "2026-07-24", 18.5, 25, 3.2, "서울 강남구", "서울 마포구", 172.9)
-        )
-    }
-
-    fun getMonthlyReports(): List<MonthlyReport> {
-        return listOf(
-            MonthlyReport("2026-07", 1250.0, 230.5, 45000, 184.4),
-            MonthlyReport("2026-06", 1420.0, 260.0, 52000, 183.1),
-            MonthlyReport("2026-05", 980.0, 175.0, 34000, 178.5)
-        )
-    }
-
-    fun getBatteryDegradationData(): List<BatteryDegradationItem> {
-        return listOf(
-            BatteryDegradationItem("2026-07", 25000.0, 75.0, 2.1, 470.0),
-            BatteryDegradationItem("2026-01", 18000.0, 75.8, 1.5, 473.0),
-            BatteryDegradationItem("2025-07", 10000.0, 76.2, 0.8, 477.0)
-        )
-    }
-
-    fun getSentryEvents(): List<SentryEventItem> {
-        return listOf(
-            SentryEventItem("s1", "2026-07-27 10:15", "강남역 주차장", "전면 카메라", "https://example.com/s1.mp4"),
-            SentryEventItem("s2", "2026-07-26 18:40", "판교 테크노밸리", "좌측 카메라", "https://example.com/s2.mp4")
-        )
-    }
-
-    fun getConsumables(): List<ConsumableItem> {
-        return listOf(
-            ConsumableItem("c1", "에어컨 필터", "2026-01-15", 15000.0, 20000.0, 12, 75.0),
-            ConsumableItem("c2", "와이퍼 블레이드", "2025-11-10", 12000.0, 15000.0, 12, 80.0),
-            ConsumableItem("c3", "타이어 위치 교환", "2026-03-01", 18000.0, 10000.0, 6, 90.0)
-        )
-    }
-
-    fun getJournalLogs(): List<JournalLogItem> {
-        return listOf(
-            JournalLogItem("j1", JournalType.CHARGE, "2026-07-26", "슈퍼차저 급속 충전", "80%까지 충전 완료", 12500),
-            JournalLogItem("j2", JournalType.MAINTENANCE, "2026-06-10", "타이어 공기압 점검", "전륜 공기압 보정", 0)
-        )
+            if (connection.responseCode in 200..299) {
+                val stream = connection.inputStream
+                val responseText = stream.bufferedReader().use { it.readText() }
+                JSONArray(responseText)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        } finally {
+            connection?.disconnect()
+        }
     }
 }
